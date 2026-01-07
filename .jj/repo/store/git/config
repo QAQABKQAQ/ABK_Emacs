@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+	logallrefupdates = false
+	symlinks = true
+	ignorecase = false
+	precomposeunicode = true
+[remote "orgin"]
+	url = git@github.com:QAQABKQAQ/ABK_Emacs.git
+	fetch = +refs/heads/*:refs/remotes/orgin/*

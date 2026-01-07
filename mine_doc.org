@@ -1,0 +1,13 @@
+
+* This is mine emacs doc
+** and i will write all keycommand and any need remember things
+The <Tab> can expand/consrict
+
+* The config
+** basic config
+menu-bar-mode 0 this can trun off menu bar
+tool-bar-mode 0 this can trun off tool bar
+scroll-bar-mode 0 this can trun off scroll bar
+column-number-mode 0 this can display current colum,example (15,4)
+global-display-line-numbers-mode
+setq display-line-numbers-type 'relative this enable relative line

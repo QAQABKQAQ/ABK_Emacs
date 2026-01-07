@@ -1,0 +1,35 @@
+;; emacs的自定义设置转移到自定义文件中
+(setq custom-file "~/.config/emacs/.emacs.custom.el")
+
+;; 菜单栏
+(menu-bar-mode 0)
+;; 工具栏
+(tool-bar-mode 0)
+(scroll-bar-mode 0)
+(column-number-mode 0)
+(global-display-line-numbers-mode)
+(setq display-line-numbers-type 'relative)
+(winner-mode 1)
+(load-file custom-file)
+
+
+(setq use-package-always-ensure t) ;; 每个包都添加:ensure t 关键字(确保安装)
+(setq use-package-always-defer t) ;; 延迟加载每个包都添加:defer t
+(setq use-package-always-demand nil)
+(setq use-package-expand-minimally t) ;; 
+(setq use-package-verbose t);; 安装过程打印出来
+ 
+(require 'package)
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+(package-initialize)
+(require 'use-package)
+(use-package restart-emacs)
+
+
+
+(use-package catppuccin-theme
+  :ensure t
+  :demand t
+  :init (setq catppuccin-flavor 'macchiato)
+  :config  (load-theme 'catppuccin t)) 
+(load-theme 'catppuccin :no-confirm)
