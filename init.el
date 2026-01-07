@@ -37,5 +37,5 @@
 
 (use-package magit
   :bind(("C-x g" . magit-status))
-  :config (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
+  :config (add-hook 'git-commit-setup-hook 'turn-off-flyspell)
 )
