@@ -4,28 +4,21 @@
 (
  ("/Users/albamkin/" . ".config/")
  ("/Users/albamkin/.config/" . "emacs/")
- ("/Users/albamkin/.config/emacs/" . "plugins/")
+ ("/Users/albamkin/.config/emacs/" . "auto-save-list/")
 )
 
 ;; ----- ido-work-directory-list -----
 (
- "/Users/albamkin/.config/emacs/plugins/"
  "/Users/albamkin/.config/emacs/"
 )
 
 ;; ----- ido-work-file-list -----
 (
- "init-package.el"
- "init-config.el"
- "init.el"
+ 
 )
 
 ;; ----- ido-dir-file-cache -----
 (
- ("/Users/albamkin/.config/emacs/plugins/" (26973 59796 299165 693000) "init-config.el~" "init-config.el" "../" "./")
-
- ("/Users/albamkin/.config/emacs/" (26973 59880 613286 290000) ".cache/" ".git/" "elpa/" ".jj/" ".#init.el" "init.el" ".emacs.custom.el~" "auto-save-list/" "transient/" "mine_doc.org" "mine_doc.org~" ".emacs.custom.el" "plugins/" "init.el~" "ido.last" "../" "./")
-
  ("/Users/" (26893 17379 5083 272000) "albamkin/" "Shared/" ".localized" "../" "./")
 
  ("/Users/albamkin/" (26973 52142 784965 298000) ".battery/" "thesis_code/" ".amazon-q.dotfiles.bak/" "python_prject/" ".zsh_sessions/" ".viminfo" ".bash_history" ".zcompdump-ALBamKindeMacBook-Pro-5.9.zwc" "GitHubRecoveryCodes/" ".aws/" ".cache/" "Downloads/" "front/" ".oh-my-zsh/" ".aspnet/" ".swiftpm/" ".gem/" ".bash_profile" ".antigen/" ".m2/" "life_guide/" ".hyper.js" ".claude.json" ".mysql_history" ".pyenv/" "Documents/" ".npm/" "cd/" ".zcompdump" ".Trash/" ".emacs~" ".profile" "Applications/" ".vimrc" "Movies/" "Applications (Parallels)/" "emacs_doc/" ".ssh/" ".rustup/" "github_project/" "lombok.jar" "sensitive/" "Freelance_Development/" "py_learning/" "Work/" "Programming/" "iTerm2" ".zshenv" "antigen.zsh" ".hyper_plugins/" "novel/" ".fiddler/" "Public/" ".zshrc.zwc" ".zcompdump-ALBamKindeMacBook-Pro-5.9" ".lemminx/" "jj-vcs/" "project_learning/" "rust_project/" ".dlv/" ".cargo/" "iCloud Drive (Archive)/" "rust_learning/" ".deno/" ".xargo/" ".lesshst" ".sdkman/" "Library/" "Desktop/" ".zsh_history" "go_hello/" ".claude/" "code/" ".zcompdump-ALBamKin的MacBook Pro-5.9" ".zprofile" "LocalProject/" ".bun/" ".apiLanguage.txt" "Pictures/" ".psql_history" ".local/" "learning/" ".zshrc" ".bashrc" "Proton/" "vim_turorial/" ".CFUserTextEncoding" ".yarnrc" "java_learning/" ".tmux.conf" "mine_manual/" ".DS_Store" "go/" ".vim/" "iCloud Drive (Archive) - 1/" "video/" ".docker/" "cursor_project/" ".cursor/" "Music/" "java-language-server/" ".config/" ".claude.json.backup" "../" "./")
@@ -33,6 +26,8 @@
  ("/Users/albamkin/.config/" (26973 9412 828110 345000) "fish/" "nvim_kickstart/" "jj/" "kitty/" "aerospace/" "nvim-macos-arm64/" "raycast/" "iterm2/" "nvim_old/" "emacs/" "yarn/" "lazygit/" "nvim_ast/" "nvim/" "emacs_load/" "thefuck/" "../" "./")
 
  ("/Users/albamkin/.config/emacs/auto-save-list/" (26973 47120 345481 650000) ".saves-5806-ALBamKindeMacBook-Pro.local~" "../" "./")
+
+ ("/Users/albamkin/.config/emacs/" (26973 52135 363005 48000) ".cache/" ".git/" "elpa/" ".jj/" "init.el" ".emacs.custom.el~" "auto-save-list/" "mine_doc.org" "mine_doc.org~" ".emacs.custom.el" "init.el~" "../" "./")
 )
 
 ;; ----- ido-unc-hosts-cache -----
