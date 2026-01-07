@@ -1,4 +1,4 @@
-g;; emacs的自定义设置转移到自定义文件中
+;; emacs的自定义设置转移到自定义文件中
 (setq custom-file "~/.config/emacs/.emacs.custom.el")
 
 (add-to-list 'load-path
