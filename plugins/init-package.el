@@ -9,7 +9,7 @@
 (add-to-list 'package-archives '("gnu"   . "https://elpa.gnu.org/packages/") t)
 
 
-(unless package-archive-contents
+(unless (file-exists-p package-user-dir)
   (package-refresh-contents))
 
 
@@ -28,7 +28,35 @@
   :config  (load-theme 'catppuccin t)) 
 (load-theme 'catppuccin :no-confirm)
 
-;; === Emacs 中的最强大的 git 工具
+
+
+;; == 字体 ===
+(defun my-setup-fonts ()
+ 
+  (interactive)
+  
+  
+  
+  (let ((font-name (cond ((find-font (font-spec :name "JetBrains Mono")) "JetBrains Mono")
+                         ((find-font (font-spec :name "Fira Code")) "Fira Code")
+                         ((find-font (font-spec :name "Monaco")) "Monaco")
+                         (t "Menlo")))) ;; 保底
+    (set-face-attribute 'default nil :font font-name :height 140))
+
+
+
+  (dolist (charset '(kana han symbol cjk-misc bopomofo))
+    (set-fontset-font (frame-parameter nil 'font)
+                      charset
+                      (font-spec :family "PingFang SC" :size 16))))
+
+
+(if (daemonp)
+    (add-hook 'after-make-frame-functions
+              (lambda (frame)
+                (with-selected-frame frame
+                  (my-setup-fonts))))
+  (my-setup-fonts))
 (use-package magit
   :bind(("C-x g" . magit-status))
   :config (add-hook 'git-commit-setup-hook 'turn-off-flyspell)

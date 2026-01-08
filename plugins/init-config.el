@@ -26,6 +26,7 @@
 
 (use-package no-littering
   :ensure t
+  :demand t
   :config
   ;; 1. 配合 recentf 清理
   (with-eval-after-load 'recentf
