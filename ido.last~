@@ -22,9 +22,9 @@
 
 ;; ----- ido-dir-file-cache -----
 (
- ("/Users/albamkin/.config/emacs/" (26974 20504 828548 716000) ".lsp-session-v1" ".cache/" ".git/" "elpa/" "recentf" "ielm-history.eld" ".jj/" "init.el" ".emacs.custom.el~" "url/" "auto-save-list/" "transient/" "mine_doc.org" "tramp" "ido.last~" "mine_doc.org~" ".emacs.custom.el" "plugins/" "init.el~" "tree-sitter/" "ido.last" "../" "./")
+ ("/Users/albamkin/.config/emacs/" (26974 21416 522525 443000) ".lsp-session-v1" ".cache/" ".git/" "elpa/" "recentf" "ielm-history.eld" ".jj/" "init.el" ".emacs.custom.el~" "url/" "auto-save-list/" "transient/" "mine_doc.org" "tramp" "ido.last~" "mine_doc.org~" ".emacs.custom.el" "plugins/" "init.el~" "tree-sitter/" "ido.last" "../" "./")
 
- ("/Users/albamkin/.config/emacs/plugins/" (26974 19487 363732 360000) "lsp.el" "init-package.el" "init-config.el~" "lsp.el~" "init-config.el" "../" "./")
+ ("/Users/albamkin/.config/emacs/plugins/" (26974 21400 923839 380000) "lsp.el" "init-package.el" "init-config.el~" "lsp.el~" "init-config.el" "../" "./")
 
  ("/Users/albamkin/Work/deaf_assessment/src/main/java/com/example/deaf/service/impl/" (26974 10187 948288 862000) "AuthServiceImpl.java" "AuthServiceImpl.java~" "../" "./")
 
