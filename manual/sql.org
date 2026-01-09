@@ -1,0 +1,18 @@
+
+
+
+
+使用sql-mode 去连接sql
+M-x sql-mysql / sql-postgraphsql
+连接后使用sql文件，
+在sql文件中直接C-c C-r就可以在下方sqlbuffer中看到
+
+在项目根目录需要使用
+config.yml
+# 必须额外写这么个文件，LSP 才能补全表名
+connections:
+  - driver: mysql
+    dataSourceName: root:password@tcp(127.0.0.1:3306)/test_db
+
+
+

@@ -1,9 +1,4 @@
 
-;; 菜单栏
-(menu-bar-mode 0)
-;; 工具栏
-(tool-bar-mode 0)
-(scroll-bar-mode 0)
 (column-number-mode 0)
 (global-display-line-numbers-mode)
 (setq display-line-numbers-type 'relative)
@@ -12,7 +7,8 @@
 (ido-mode 1)
 (ido-everywhere 1)
 (defalias 'yes-or-no-p 'y-or-n-p)
-
+(setq select-enable-clipboard t)
+(setq select-enable-primary t)
 (setq inhibit-startup-screen t)
 
 (setq create-lockfiles nil)

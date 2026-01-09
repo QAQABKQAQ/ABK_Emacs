@@ -6,6 +6,8 @@
  (magit-merge nil)
  (magit-pull nil)
  (magit-push nil)
- (magit-rebase
-  ("--autostash"))
+ (magit-rebase nil
+	       ("--autostash"))
+ (magit-remote
+  ("-f"))
  (magit-reset nil))
