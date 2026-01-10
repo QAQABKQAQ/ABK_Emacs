@@ -12,7 +12,7 @@
 (setq select-enable-primary nil)
 (setq select-enable-clipboard t)
 (setq save-interprogram-paste-before-kill nil)
-
+(global-set-key (kbd "C-c c") 'compile)    ;; Compile
 ;; C-g看错误
 ;; (toggle-debug-on-quit)
 ;; emacs的自定义设置转移到自定义文件中
