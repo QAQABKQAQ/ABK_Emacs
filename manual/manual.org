@@ -1,0 +1,26 @@
+* 键位
+** 高频
+C-s 在当前文件内所搜内容
+C-c f 在项目内搜索文件 telescope
+C-c g 在项目内搜索文件内内容 telescope
+C-x b 切换buffer
+M-g o 切换大纲
+** 文件管理
+C-c d 全屏打开文件管理器
+C-c s 侧边栏打开文件管理器
+TAB 列表内折叠/展开文件夹
+a 快速访问常用目录
+y 复制文件名/目录
+** 代码-LSP
+M-. 跳转到定义
+M-, 跳回来
+C-c l r 重命名变量
+C-c l a 代码修复/动作
+C-c l = 格式化代码
+p** 编译与运行
+C-c shell窗口
+** git
+C-x g 打开Magit面板
+s git add
+c c git commit
+P u git push 

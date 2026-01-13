@@ -17,15 +17,29 @@
 ;; 安装过程详细打印 (如果出错方便看日志，稳定后可设为 nil)
 (setq use-package-verbose t)
 
-
 ;; --- 2. 基础工具类插件 ---
 
 ;; 快速重启 Emacs 的命令 (M-x restart-emacs)
-(use-package restart-emacs)
+(use-package restart-emacs
+  :ensure t)
 
 ;; 增强的序列处理库 (很多新插件依赖这个)
 (use-package seq
   :ensure t)
+
+
+(use-package avy
+  :ensure t
+  :bind
+  (("C-'" . avy-goto-char-timer)  ;; 核心命令：按 C-j，再输入你想去的字符（支持连续输入过滤）
+   ("M-g l" . avy-goto-line)      ;; 快速跳到某一行（比 M-g g 这种要输入数字的快多了）
+   ))
+
+
+;; 推荐设置：让 Avy 更懂你
+(setq avy-background t) ;; 即使在背景中也能看清文字
+(setq avy-timeout-seconds 0.5) ;; 输入间隔，给你 0.3 秒连按字符来精确定位
+
 
 ;; 自动管理垃圾文件 (把自动保存、备份文件统一放到 var 目录下，保持整洁)
 (use-package no-littering
@@ -46,7 +60,10 @@
         `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
 
 ;; --- 3. 备份策略设置 ---
-(setq make-backup-files t)      ;; 开启：编辑文件时自动备份
+;;(setq make-backup-files t)      ;; 开启：编辑文件时自动备份
+(setq make-backup-files nil);; 带有~的文件
+(setq auto-save-default nil);; 自动保存文件，带有#的文件
+(setq create-lockfiles nil);;.#文件，主要告诉别人这个文件我在使用
 (setq version-control t)        ;; 开启：使用版本控制方式命名备份文件 (file.~1~, file.~2~)
 (setq backup-by-copying t)      ;; 开启：通过复制方式备份 (防止破坏硬链接)
 (setq delete-old-versions t)    ;; 开启：自动删除过旧的备份文件
@@ -105,6 +122,7 @@
 ;; [UI] Vertico: 垂直补全列表 (替代 Ivy)
 (use-package vertico
   :ensure t
+  :demand t
   :init
   (vertico-mode) ;; 开启 Vertico 模式
   :config
@@ -227,8 +245,9 @@
 
 
 ;; --- 11. 加载其他模块 ---
-;; 加载 LSP 配置 (lsp.el)
-(require 'lsp)
-
+;; LSP 配置 (lsp.el)
+;;(require 'lsp)
+;;(require 'fast-lsp)
+(require 'lsp-eglot)
 ;; 声明本文件已提供 init-package 功能
 (provide 'init-package)

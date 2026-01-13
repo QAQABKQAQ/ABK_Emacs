@@ -1,4 +1,5 @@
-((magit-branch nil)
+((dirvish-quicksort nil)
+ (magit-branch nil)
  (magit-commit nil)
  (magit-fetch nil)
  (magit-gitignore nil)

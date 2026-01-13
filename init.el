@@ -1,7 +1,4 @@
 
-
-
-
 ;; 菜单栏
 (menu-bar-mode -1)
 ;; 工具栏
@@ -28,30 +25,30 @@
 (setq package-archives '(("gnu". "https://elpa.gnu.org/packages/")
 			 ("nongnu" . "https://elpa.nongnu.org/nongnu/")
 			 ("melpa" . "https://melpa.org/packages/")))
-(setq package-enable-at-startup t)
-;; 下载插件时先M-x package-refresh-contents
-;; 刷新后再package-install
-;; (unless (file-exists-p package-user-dir)
-;;  (message "插件目录不存在"))
-;; (setq url-queue-timeout 3)
-;; (setq package-check-signature nil)
-;; (unless (package-installed-p 'use-package)
-;;   (message "正在初始化")
-;;   (package-refresh-contents)
-;;   (package-install 'use-package))
+(setq package-enable-at-startup nil)
+(package-initialize);; 显式启用
+
+
 
 (setq url-queue-timeout 5) ;; 网络超时设短一点，别死等
 (setq package-check-signature nil)
 
+
+;; unless 条件为假，执行代码
+;; 如果没有安装use-package,下面执行安装
 (unless (package-installed-p 'use-package)
   (message "首次启动：正在联网安装 use-package，请耐心等待...")
   (package-refresh-contents)  ;; 只有这一种情况才允许启动时刷新
   (package-install 'use-package))
 
 (require 'use-package)
-; (unless (package-installed-p 'use-package)
-;   (package-install 'use-package))
+
+
+
+
 
 (require 'init-package)
-(require 'init-config)
 
+
+
+(require 'init-config)
