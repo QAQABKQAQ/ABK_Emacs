@@ -106,6 +106,13 @@
   (add-to-list 'completion-at-point-functions #'cape-dabbrev))
 
 
-(global-set-key (kbd "C-<tab>") 'completion-at-point)
+(global-set-key (kbd "C-M-i") 'completion-at-point)
 
 (provide 'lsp-eglot)
+
+
+
+
+
+
+

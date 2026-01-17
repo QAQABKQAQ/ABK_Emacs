@@ -1,3 +1,4 @@
+
 ;; --- 1. Use-Package 全局设定 ---
 ;; 确保 use-package 自身已被加载
 (require 'use-package)
@@ -31,7 +32,7 @@
 (use-package avy
   :ensure t
   :bind
-  (("C-'" . avy-goto-char-timer)  ;; 核心命令：按 C-j，再输入你想去的字符（支持连续输入过滤）
+  (("C-'" . avy-goto-char-timer)  ;; 核心命令：按 C-'，再输入你想去的字符（支持连续输入过滤）
    ("M-g l" . avy-goto-line)      ;; 快速跳到某一行（比 M-g g 这种要输入数字的快多了）
    ))
 
