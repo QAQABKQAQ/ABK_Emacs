@@ -1,24 +1,38 @@
-/elpa/dirvish-20250504.807/
-/elpa/sql-indent-1.7/*.md
-/elpa/marginalia-20260104.1119/
-/elpa/nerd-icons-20251230.1532/
-/elpa/posframe-20251125.846/
-/elpa/sql-indent-1.7/
-/elpa/vertico-20260105.1514/
-/elpa/vertico-posframe-0.9.0/
-/tree-sitter/libtree-sitter-css.dylib
-/tree-sitter/libtree-sitter-elisp.dylib
-/tree-sitter/libtree-sitter-go.dylib
-/tree-sitter/libtree-sitter-html.dylib
-/tree-sitter/libtree-sitter-javascript.dylib
-/tree-sitter/libtree-sitter-json.dylib
-/tree-sitter/libtree-sitter-make.dylib
-/tree-sitter/libtree-sitter-markdown.dylib
-/tree-sitter/libtree-sitter-python.dylib
-/tree-sitter/libtree-sitter-toml.dylib
-/tree-sitter/*.dylib
-/var/auto-save/
-/var/backup/*.git!COMMIT_EDITMSG
-/var/backup/*.el
-/var/backup/!Users!albamkin!.config!emacs!manual!sql-code.sql.~2~
-/var/
+
+*~
+\#*\#
+*.elc
+
+# 缓存目录
+.cache/
+auto-save-list/
+.ctags.d/
+
+# 会话和状态文件
+.lsp-session-v1
+.mc-lists.el
+.tags
+ido.last
+recentf
+tramp
+ielm-history.eld
+
+# 包目录 (可通过 package-install 自动安装)
+elpa/
+
+# Tree-sitter 编译库
+tree-sitter/
+
+# 运行时数据
+var/
+etc/
+transient/
+url/
+
+# IDE/语言服务器缓存
+eclipse.jdt.ls/
+java/
+
+# 版本控制
+.jj/
+auto-save-list/
