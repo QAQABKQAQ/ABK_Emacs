@@ -1,0 +1,12 @@
+-o
+.tags
+-L
+.ctags.d/0.list
+# Programming languages to be scanned, or "all" for all supported languages
+--languages=Lisp
+--kinds-all=*
+--fields=*
+--extras=*
+--recurse
+--exclude=.jj
+--exclude=.jj/
