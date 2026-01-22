@@ -1,2 +1,0 @@
-;;   -*- mode: lisp-data; -*-
-(((elisp org-element--headline-cache)) ((elisp org-element--cache)) ((version "2.3")))
