@@ -65,6 +65,8 @@
 
 (package-initialize);; 显式启用
 
+
+
 ;; Emacs29以上自带use-package,直接require就可以使用
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
@@ -245,9 +247,12 @@
     :hook (java-mode . eglot-java-mode)
     :init
     (setq eglot-java-server-install-dir (expand-file-name "eclipse.jdt.ls" user-emacs-directory))
+    (setenv "JAVA_TOOL_OPTIONS" 
+            (concat "-javaagent:" (expand-file-name "java/lombok.jar" user-emacs-directory)))
     (setenv "JAVA_HOME" "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home")
-        (setenv "PATH" (concat "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin:" (getenv "PATH")))
-  (add-to-list 'exec-path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin")
+    (setenv "PATH" (concat "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin:" (getenv "PATH")))
+    (add-to-list 'exec-path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin")
+    
     )
 
 (use-package nerd-icons
@@ -335,6 +340,12 @@
   (("C-`" . my/toggle-vterm)))
 
 
+;; === Git ===
+(use-package magit
+  :ensure t
+  :bind (("C-x g" . magit-status))
+  :config
+  (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
 
 
 ;; 设置字体
