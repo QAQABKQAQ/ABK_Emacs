@@ -1,147 +1,33 @@
 
 ;; 原生光标移动
-;; C-f/b 单个字符移动 h/l
-;; M-f/b 单个单词移动 e/b
-;; M-a/e 语句块移动
-;; M-{/} 跳过整个空行分割的块
-;; C-M-f/b 括号移动,比如从`(`跳到`)`
-;; C-M-n/p 括号跳转
-;; === LSP 补全 ===
-;; C-return LSP+ctags补全窗口
-;; C-x c j 跳转符号定义
-;; C-x c p 在小窗口预览定义
-;; C-. 跳转定义LSP
-;; C-, 跳回
-;; === 插件 ===
-;; C-' avy 查找字符移动，相当于nvim - flash
-;; M-g l 跳转到行
-;; M-g w 跳转到单词的首字母
-;; M-g e 把远处的行移动过来
-;; M-g c 把远处的行拷过来
-;; k -> 杀掉那一行
-;; y -> 复制那一行
-;; t -> 把那一行瞬移到我这里
+;;===================
+;; emacs init       |
+;; Author: Ephemera |
+;;===================
 
-;; C-s 查找行字符
-;; C-x b 查找buffer
-;; M-g o `consult-outline` 大范围跳转，原理为将标题，类名，方法名作为了锚点
-;; C-c f 查找文件
-;; C-c g 查找单词
-
-;; font :
-;; Monaspace Neon medium normal
-
-
-
-
-(setq custom-file (expand-file-name ".emacs.custom.el" user-emacs-directory))
-(load custom-file t t)
-
-
-(setq inhibit-startup-message t)
-
-
-
-
-(org-babel-do-load-languages
- 'org-babel-load-languages
- '((emacs-lisp . t)
-   (sql . t)
-   (shell . t)  
-   (python . t) 
-   (js . t)     
-   ))
-
-
-(column-number-mode 0)
-(global-display-line-numbers-mode)
-(setq display-line-numbers-type 'relative)
-(menu-bar-mode -1)
-(tool-bar-mode -1)
-(scroll-bar-mode -1)
-      
-(require 'package)
-(setq package-enable-at-startup nil);;取消自启
-
-(setq package-archives '(("gnu". "https://elpa.gnu.org/packages/")
-			 ("nongnu" . "https://elpa.nongnu.org/nongnu/")
-			 ("melpa-tuna"  . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-			 ("melpa" . "https://melpa.org/packages/")))
-
-(package-initialize);; 显式启用
-
-
-
-;; Emacs29以上自带use-package,直接require就可以使用
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(require 'cl-lib)
-(require 'use-package)
-
-
-
-
-
-
-
-;; === theme ===
-;; 主题
-(use-package catppuccin-theme
-  :ensure t
-  :demand t
-  :init
-  (setq catppuccin-flavor 'mocha)
-  :config
-  (load-theme 'catppuccin t)
-  )
-
-
-
-;; 多光标
-(use-package  multiple-cursors
-  :ensure t
-  :bind (
-   ("C-S-c C-S-c" . mc/edit-lines);; 选中区域转换可编辑行
-   ("C->" . mc/mark-next-like-this);; 向上延伸光标
-   ("C-<" . mc/mark-previous-like-this);; 向上延伸光标
-   ("C-c C-<" . mc/mark-all-like-this));; 把当前选中的单词前面都加上光标
-  )
-
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+  (load custom-file))
 
 
 (use-package vertico
   :ensure t
   :init
-  (vertico-mode)
-  :config
-  (setq vertico-cycle t)) 
+  (vertico-mode))
 
-
-
-(use-package vertico-posframe
+(use-package orderless
   :ensure t
-  :after vertico
-  :config
-  (vertico-posframe-mode 1)
-
-  (setq vertico-posframe-parameters
-        '((left-fringe . 8)
-          (right-fringe . 8)))
-
-  (setq vertico-posframe-poshandler #'posframe-poshandler-frame-center))
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides '((file (styles basic partial-completion))))
+  (completion-pcm-leading-wildcard t)
+  (completion-category-defaults nil))
 
 
-(use-package consult
+;; 窗口切换
+(use-package ace-window
   :ensure t
-  :bind (
-         ("C-s" . consult-line)
-         ("C-x b" . consult-buffer)
-         ("C-c f" . consult-find)
-         ("C-c g" . consult-ripgrep)
-         ("M-g o" . consult-outline))
-  :config
-  (setq consult-preview-key 'any))
+  :bind ("M-o" . ace-window)) ; 替换原生的 M-o
 
 
 (use-package marginalia
@@ -149,147 +35,26 @@
   :init
   (marginalia-mode))
 
-
-
-;; 尝试插件但是不下载到本地
-(use-package try
-  :ensure t)
-
-;; 指令重启Emacs
-(use-package restart-emacs
-  :ensure t)
-
-(use-package which-key
+(use-package consult
   :ensure t
-  :config (which-key-mode))
-
-(use-package seq
-  :ensure t)
-
-(use-package move-text
-  :ensure t
-  :bind (("M-p" . move-text-up)   
-         ("M-n" . move-text-down))) 
-
-(use-package avy
-  :ensure t
-  :bind
-  (("C-'" . avy-goto-char-timer)
-   ("M-g l" . avy-goto-line)
-   ("M-g w" . avy-goto-word-1)  ; 新增：跳到单词首字母
-   ("M-g e" . avy-move-line)    ; 新增：把远处的行移过来
-   ("M-g c" . avy-copy-line))   ; 新增：把远处的行拷过来
+  :bind (;; 1. 项目全局搜索
+         ("C-c s p" . consult-ripgrep)
+         ;; 2. 搜索当前项目的所有 Buffer
+         ("C-c s b" . consult-project-buffer)
+         ;; 3. 极其强大的跳转功能
+         ("M-g g" . consult-goto-line)     ; 带预览的行跳转
+         ("M-g m" . consult-mark)          ; 跳转到标记点
+         ("M-g i" . consult-imenu)         ; 跳转到当前文件的函数/类定义 (Java/C++ 必备)
+         ;; 4. 搜索增强
+         ("C-s" . consult-line))           ; 替换原生搜索，带实时预览
   :config
-  (setq avy-background t)
-  (setq avy-timeout-seconds 0.5)
-  (setq avy-all-windows t)      ; 允许跨窗口跳转
-  
-  ;; --- 高级功能：Dispatch (远程操作) ---
-  (defun my/avy-action-kill-whole-line (pt)
-    (save-excursion
-      (goto-char pt)
-      (kill-whole-line))
-    (select-window
-     (cdr (ring-ref avy-ring 0)))
-    t)
+  (setq consult-preview-key 'any)) ; 实时预览
 
-  (defun my/avy-action-copy-whole-line (pt)
-    (save-excursion
-      (goto-char pt)
-      (cl-destructuring-bind (start . end) (bounds-of-thing-at-point 'line)
-        (copy-region-as-kill start end))
-      (message "Copied line"))
-    t)
-
-  (defun my/avy-action-yank-whole-line (pt)
-    (my/avy-action-copy-whole-line pt)
-    (save-excursion (yank))
-    t)
-
-  ;; 绑定：
-  ;; k -> 杀掉那一行
-  ;; y -> 复制那一行
-  ;; t -> 把那一行瞬移到我这里
-  (setq avy-dispatch-alist
-        '((?k . my/avy-action-kill-whole-line)
-          (?y . my/avy-action-copy-whole-line)
-          (?t . my/avy-action-yank-whole-line)))
-  )
-
-
-;; ==ctags==
-(use-package citre
-  :ensure t
-  :defer t
-  :init
-  (require 'citre-config)
-  (citre-auto-enable-citre-mode)
-  :bind
-  (
-   ("C-x c j" . citre-jump)
-   ("C-x c p" . citre-peek)
-   ("C-x c u" . citre-update-this-tags-file)
-   )
-  :config
-  (setq citre-use-project-root-when-creating-tags t)
-  (setq citre-prompt-language-for-ctags-command t )
-  (setq citre-peek-use-icons t)
-  (add-hook 'after-save-hook 
-            (lambda () 
-              (when (and (bound-and-true-p citre-mode)
-                         (fboundp 'citre-get-tags-file-path)
-                         (citre-get-tags-file-path))
-                (citre-update-this-tags-file))))
-  
-  )
-
-
-
-
-
-
-;; ===LSP===
-;; === Part 1: Eglot (只负责连接 LSP 服务) ===
-(use-package eglot
-  :ensure nil
-  :hook (prog-mode . eglot-ensure) ; 在所有编程语言中启动
-  :config
-  (setq eglot-ignored-server-capabilities '(:documentHighlightProvider)))
-
-(use-package eglot-java
-    :ensure t
-    :hook (java-mode . eglot-java-mode)
-    :init
-    (setq eglot-java-server-install-dir (expand-file-name "eclipse.jdt.ls" user-emacs-directory))
-    (setenv "JAVA_TOOL_OPTIONS" 
-            (concat "-javaagent:" (expand-file-name "java/lombok.jar" user-emacs-directory)))
-    (setenv "JAVA_HOME" "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home")
-    (setenv "PATH" (concat "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin:" (getenv "PATH")))
-    (add-to-list 'exec-path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin")
-    
-    )
-
-(use-package nerd-icons
-	      :ensure t)
-(use-package nerd-icons-corfu
-  :ensure t
-  :after corfu
-  :config
-  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
-
-;; === 代码模板 === 
-(use-package yasnippet
-  :ensure t
-  :config
-  (yas-global-mode 1))
-
-(use-package yasnippet-snippets
-  :ensure t
-  :after yasnippet)
-
-(use-package yasnippet-capf
-  :ensure t
-  :after cape)
+(use-package project
+  :ensure nil ; 内置
+  :bind (("C-x p f" . project-find-file)    ; 快速找项目内的文件
+         ("C-x p b" . project-switch-to-buffer) ; 只在项目 Buffer 间切换
+         ("C-x p c" . project-compile)))   ; 在项目根目录运行编译
 
 (use-package corfu
   :ensure t
@@ -310,62 +75,77 @@
    corfu-preview-current nil
    )
   (corfu-popupinfo-mode)
+ )
 
 
-  (unless (display-graphic-p)
-    (corfu-terminal-mode +1)))
-
-
-(use-package cape
+(use-package rust-mode
   :ensure t
+  :mode "\\.rs\\'"
   :init
-  ;; 全局开启文件路径补全 (比如在 scratch 或 git commit 中)
-  (add-to-list 'completion-at-point-functions #'cape-file)
-  :bind
-  (:map global-map
-	("<C-return>" . completion-at-point))
+  )
+;;  (setq rust-format-on-save t)) ; 自动格式化
+
+
+;; ==== emacs 内置
+(use-package eglot
+  :ensure nil
+  :hook ((rust-ts-mode . eglot-ensure)
+         (rust-mode . eglot-ensure)
+         (go-mode . eglot-ensure)
+         (c++-mode . eglot-ensure)
+         (java-mode . eglot-ensure))
   :config
-  (setq corfu-quit-no-match 'separator)
-  (defun my/eglot-capf ()
-    (setq-local completion-at-point-functions
-                (list (cape-capf-super
-                       #'eglot-completion-at-point ; 1. 智能代码补全 (Eglot)
-		       #'yasnippet-capf ; 代码模板
-		       #'citre-completion-at-point ;ctags
-                       #'cape-dabbrev              ; 2. 单词补全 (Cape)
-                       #'cape-file))))             ; 3. 路径补全 (Cape)
-  :hook (eglot-managed-mode . my/eglot-capf))
+  ;; 自动格式化
+  (add-hook 'before-save-hook 
+            (lambda () 
+              (when (eglot-managed-p) 
+                (eglot-format-buffer)))))
 
 
- (use-package orderless
-  :ensure t
-  :init
-  (setq completion-styles '(orderless basic)
-        completion-category-defaults nil
-        completion-category-overrides '((file (styles partial-completion)))))
 
 
-;; 终端
-(use-package vterm
-  :ensure t
+
+
+
+(use-package flymake
+  :ensure nil
+  :bind (:map flymake-mode-map
+              ("M-n" . flymake-goto-next-error)
+              ("M-p" . flymake-goto-prev-error)
+              ("C-c ! l" . flymake-show-buffer-diagnostics)) ; 列表显示当前文件所有问题
   :config
-  (setq vterm-max-scrollback 10000)
-  (setq vterm-kill-buffer-on-exit t)
-  (add-hook 'vterm-mode-hook
-	    (lambda()
-	      (display-line-numbers-mode -1)
-	      (hl-line-mode -1)
-	      (corfu-mode -1)))
-  (defun my/toggle-vterm()
-    (interactive)
-    (let ((buffer-name "*vterm*"))
-      (if (equal (buffer-name) buffer-name)
-	  (switch-to-buffer (other-buffer (current-buffer) 1))
-	(if (get-buffer buffer-name)
-	    (switch-to-buffer buffer-name)
-	  (vterm buffer-name)))))
-  :bind
-  (("C-`" . my/toggle-vterm)))
+    (setq flymake-mode-line-format
+        '(" " flymake-mode-line-exception flymake-mode-line-counters))
+  (setq flymake-mode-line-counter-format
+        '("["
+          (:propertize flymake-mode-line-error-counter
+                       face flymake-error-echo-at-point)
+          ":"
+          (:propertize flymake-mode-line-warning-counter
+                       face flymake-warning-echo-at-point)
+          "]"))
+  ;; 缩短 ElDoc (显示文档/报错) 的响应时间
+  (setq eldoc-idle-delay 0.1)
+  ;; 让报错信息显示得更完整，但不要让它自动撑开回显区高度
+  (setq eldoc-echo-area-use-multiline-p nil)
+  ;; 错误指示灯放在左侧边缘
+  (setq flymake-fringe-indicator-position 'left-fringe)
+  ;; 没有错误时不显示 0
+  (setq flymake-suppress-zero-counters t))
+
+
+
+
+;; modeline 美化
+(use-package doom-modeline
+  :ensure t
+  :init (doom-modeline-mode 1)
+  :custom
+  (doom-modeline-height 25)     ; 设置合适的高度
+  (doom-modeline-bar-width 3)   ; 左侧装饰条宽度
+  (doom-modeline-icon t)        ; 开启图标（需安装 nerd-icons）
+  (doom-modeline-major-mode-icon t)
+  (doom-modeline-buffer-file-name-style 'truncate-with-project)) ; 智能显示路径
 
 
 ;; === Git ===
@@ -375,29 +155,39 @@
   :config
   (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
 
-
-;; 设置字体
-;; 英文字体:https://monaspace.githubnext.com/
-;; 中文字体:https://github.com/lxgw/LxgwWenKai
-(defun my/apply-font-config ()
+;; ==== defun ====
+(defun open-init-file()
   (interactive)
-  (when (display-graphic-p)
-
-    (set-face-attribute 'default nil
-			:family "Monaspace Neon"
-			:height 140
-			:weight 'normal
-			)
-    (dolist (charset '(kana han symbol cjk-misc bopomofo))
-      (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono")))
-    (setq face-font-rescale-alist '(("LXGW WenKai Mono" . 1.25))))
+  (find-file "~/.config/emacs/init.el")
   )
-  
 
-(add-hook 'after-init-hook #'my/apply-font-config)
-(add-hook 'window-setup-hook #'my/apply-font-config)
-(add-hook 'server-after-make-frame-hook #'my/apply-font-config)
+(defun my/project-run ()
+  (interactive)
+  (let ((default-directory (project-root (project-current t))))
+    (cond
+     ((file-exists-p "Cargo.toml") (compile "cargo run"))
+     ((file-exists-p "go.mod")     (compile "go run ."))
+     ((file-exists-p "pom.xml")    (compile "mvn exec:java"))
+     ((file-exists-p "Makefile")   (compile "make -k"))
+     (t (call-interactively 'compile)))))
+
+;; ==== key ====
+(global-set-key (kbd "<f2>") 'open-init-file)
+(global-set-key (kbd "<f5>") 'my/project-run)
 
 
-(my/apply-font-config)
 
+
+;; ==== theme ====
+(load-theme 'modus-vivendi t)
+
+
+
+
+
+;; 放在最后一行
+;; 降低gc 防止占用过高
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 16 1024 1024))))
+ 
