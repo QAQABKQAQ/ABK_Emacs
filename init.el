@@ -6,7 +6,12 @@
 ;; M-{/} 跳过整个空行分割的块
 ;; C-M-f/b 括号移动,比如从`(`跳到`)`
 ;; C-M-n/p 括号跳转
-
+;; === LSP 补全 ===
+;; C-return LSP+ctags补全窗口
+;; C-x c j 跳转符号定义
+;; C-x c p 在小窗口预览定义
+;; C-. 跳转定义LSP
+;; C-, 跳回
 ;; === 插件 ===
 ;; C-' avy 查找字符移动，相当于nvim - flash
 ;; M-g l 跳转到行
@@ -78,7 +83,10 @@
 
 
 
+
+
 ;; === theme ===
+;; 主题
 (use-package catppuccin-theme
   :ensure t
   :demand t
@@ -90,7 +98,7 @@
 
 
 
-
+;; 多光标
 (use-package  multiple-cursors
   :ensure t
   :bind (
@@ -99,6 +107,7 @@
    ("C-<" . mc/mark-previous-like-this);; 向上延伸光标
    ("C-c C-<" . mc/mark-all-like-this));; 把当前选中的单词前面都加上光标
   )
+
 
 
 (use-package vertico
@@ -157,13 +166,17 @@
 (use-package seq
   :ensure t)
 
+(use-package move-text
+  :ensure t
+  :bind (("M-p" . move-text-up)   
+         ("M-n" . move-text-down))) 
 
 (use-package avy
   :ensure t
   :bind
   (("C-'" . avy-goto-char-timer)
    ("M-g l" . avy-goto-line)
-   ("M-g w" . avy-goto-word-1)  ; 新增：跳到单词首字母，比 timer 更精准
+   ("M-g w" . avy-goto-word-1)  ; 新增：跳到单词首字母
    ("M-g e" . avy-move-line)    ; 新增：把远处的行移过来
    ("M-g c" . avy-copy-line))   ; 新增：把远处的行拷过来
   :config
@@ -224,6 +237,7 @@
   (add-hook 'after-save-hook 
             (lambda () 
               (when (and (bound-and-true-p citre-mode)
+                         (fboundp 'citre-get-tags-file-path)
                          (citre-get-tags-file-path))
                 (citre-update-this-tags-file))))
   
@@ -263,6 +277,19 @@
   :config
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
+;; === 代码模板 === 
+(use-package yasnippet
+  :ensure t
+  :config
+  (yas-global-mode 1))
+
+(use-package yasnippet-snippets
+  :ensure t
+  :after yasnippet)
+
+(use-package yasnippet-capf
+  :ensure t
+  :after cape)
 
 (use-package corfu
   :ensure t
@@ -296,14 +323,15 @@
   (add-to-list 'completion-at-point-functions #'cape-file)
   :bind
   (:map global-map
-	("<M-return>" . completion-at-point))
+	("<C-return>" . completion-at-point))
   :config
   (setq corfu-quit-no-match 'separator)
   (defun my/eglot-capf ()
     (setq-local completion-at-point-functions
                 (list (cape-capf-super
                        #'eglot-completion-at-point ; 1. 智能代码补全 (Eglot)
-		       #'citre-completion-at-point
+		       #'yasnippet-capf ; 代码模板
+		       #'citre-completion-at-point ;ctags
                        #'cape-dabbrev              ; 2. 单词补全 (Cape)
                        #'cape-file))))             ; 3. 路径补全 (Cape)
   :hook (eglot-managed-mode . my/eglot-capf))

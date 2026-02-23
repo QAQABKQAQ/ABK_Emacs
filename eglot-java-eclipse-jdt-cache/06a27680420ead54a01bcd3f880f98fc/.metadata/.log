@@ -1,0 +1,309 @@
+!SESSION 2026-01-26 14:17:03.025 -----------------------------------------------
+eclipse.buildId=unknown
+java.version=21.0.9
+java.vendor=Homebrew
+BootLoader constants: OS=macosx, ARCH=aarch64, WS=cocoa, NL=en_US
+Command-line arguments:  -data /Users/albamkin/.config/emacs/eglot-java-eclipse-jdt-cache/06a27680420ead54a01bcd3f880f98fc
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:04.767
+!MESSAGE class org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin is started
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:04.789
+!MESSAGE Started org.eclipse.buildship.core 15ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:04.790
+!MESSAGE Started org.eclipse.m2e.core 0ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:04.846
+!MESSAGE Main thread is waiting
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:04.860
+!MESSAGE >> initialize
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:04.861
+!MESSAGE Initializing Java Language Server 1.55.0.202601131729
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:05.070
+!MESSAGE ProjectRegistryRefreshJob finished 280ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:05.553
+!MESSAGE Default VM Install changed from  null to net.java.openjdk.jdk-/opt/homebrew/Cellar/openjdk@21/21.0.9/libexec/openjdk.jdk/Contents/Home
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:05.560
+!MESSAGE Setting java.home /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home as default global VM
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:05.562
+!MESSAGE Default VM Install changed from  net.java.openjdk.jdk-/opt/homebrew/Cellar/openjdk@21/21.0.9/libexec/openjdk.jdk/Contents/Home to 1769408225560-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:05.897
+!MESSAGE JVM Runtimes changed, saving new configuration
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.076
+!MESSAGE Static Commands: []
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.076
+!MESSAGE Non-Static Commands: [java.project.import, java.project.changeImportedProjects, java.navigate.openTypeHierarchy, java.project.resolveStackTraceLocation, java.edit.handlePasteEvent, java.edit.stringFormatting, java.project.getSettings, java.project.resolveWorkspaceSymbol, java.project.upgradeGradle, java.project.createModuleInfo, java.vm.getAllInstalls, java.edit.organizeImports, java.project.refreshDiagnostics, java.project.removeFromSourcePath, java.project.listSourcePaths, java.project.updateSettings, java.project.getAll, java.reloadBundles, java.project.isTestFile, java.project.resolveText, java.project.getClasspaths, java.navigate.resolveTypeHierarchy, java.getTroubleshootingInfo, java.edit.smartSemicolonDetection, java.project.updateSourceAttachment, java.project.updateClassPaths, java.decompile, java.protobuf.generateSources, java.project.resolveSourceAttachment, java.project.updateJdk, java.project.addToSourcePath, java.completion.onDidSelect]
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.080
+!MESSAGE RepositoryRegistryUpdateJob finished 0ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.084
+!MESSAGE >> initialized
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.087
+!MESSAGE Importers: GradleProjectImporter, MavenProjectImporter, EclipseProjectImporter, InvisibleProjectImporter
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.092
+!MESSAGE Importing Maven project(s)
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.725
+!MESSAGE Workspace initialized in 645ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:06.748
+!MESSAGE >> initialization job finished
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:07.233
+!MESSAGE >> build jobs finished
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:07.233
+!MESSAGE >> registerWatchers'
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:07.236
+!MESSAGE >> registerFeature 'workspace/didChangeWatchedFiles'
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:07.407
+!MESSAGE Reconciled 1. Took 0 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:08.084
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:08.092
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:08.095
+!MESSAGE Validated 1. Took 82 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:32.896
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:34.031
+!MESSAGE Reconciled 1. Took 11 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:34.470
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:34.470
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:34.471
+!MESSAGE Validated 1. Took 34 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:35.167
+!MESSAGE Reconciled 1. Took 6 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:35.602
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:35.602
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:35.602
+!MESSAGE Validated 1. Took 33 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:41.694
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:53.429
+!MESSAGE Reconciled 1. Took 1 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:53.859
+!MESSAGE begin problem for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:53.860
+!MESSAGE 0 problems reported for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:53.860
+!MESSAGE Validated 1. Took 27 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:17:57.901
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:00.215
+!MESSAGE Reconciled 1. Took 19 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:00.671
+!MESSAGE begin problem for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:00.672
+!MESSAGE 4 problems reported for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:00.687
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:00.687
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:00.687
+!MESSAGE Validated 2. Took 68 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:01.412
+!MESSAGE Reconciled 1. Took 4 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:01.468
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:01.836
+!MESSAGE begin problem for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:01.836
+!MESSAGE 0 problems reported for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:01.837
+!MESSAGE Validated 1. Took 19 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:03.946
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:04.972
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:12.444
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:17.765
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 14:18:29.866
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 15:48:37.931
+!MESSAGE Reconciled 1. Took 1 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 15:48:38.482
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 15:48:38.482
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-26 15:48:38.483
+!MESSAGE Validated 1. Took 109 ms
+
+!ENTRY org.eclipse.jdt.core 4 4 2026-01-26 15:53:37.560
+!MESSAGE JavaBuilder handling ImageBuilderInternalException while building: PDFReader
+!STACK 1
+org.eclipse.core.internal.resources.ResourceException(/PDFReader/target/classes/com/example/PDFReader/controller/PdfController.java~)[272]: java.lang.Exception: Resource already exists on disk: '/PDFReader/target/classes/com/example/PDFReader/controller/PdfController.java~'.
+	at org.eclipse.core.internal.resources.ResourceException.provideStackTrace(ResourceException.java:42)
+	at org.eclipse.core.internal.resources.ResourceException.<init>(ResourceException.java:38)
+	at org.eclipse.core.internal.localstore.FileSystemResourceManager.copy(FileSystemResourceManager.java:395)
+	at org.eclipse.core.internal.resources.Resource.copy(Resource.java:591)
+	at org.eclipse.jdt.internal.core.builder.AbstractImageBuilder.copyResource(AbstractImageBuilder.java:520)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:727)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:553)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.build(IncrementalImageBuilder.java:137)
+	at org.eclipse.jdt.internal.core.builder.JavaBuilder.buildDeltas(JavaBuilder.java:330)
+	at org.eclipse.jdt.internal.core.builder.JavaBuilder.build(JavaBuilder.java:247)
+	at org.eclipse.core.internal.events.BuildManager$2.run(BuildManager.java:1109)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:47)
+	at org.eclipse.core.internal.events.BuildManager.basicBuild(BuildManager.java:299)
+	at org.eclipse.core.internal.events.BuildManager.basicBuild(BuildManager.java:355)
+	at org.eclipse.core.internal.events.BuildManager$1.run(BuildManager.java:449)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:47)
+	at org.eclipse.core.internal.events.BuildManager.basicBuild(BuildManager.java:452)
+	at org.eclipse.core.internal.events.BuildManager.basicBuildLoop(BuildManager.java:564)
+	at org.eclipse.core.internal.events.BuildManager.basicBuildLoop(BuildManager.java:512)
+	at org.eclipse.core.internal.events.BuildManager.build(BuildManager.java:594)
+	at org.eclipse.core.internal.events.AutoBuildJob.doBuild(AutoBuildJob.java:208)
+	at org.eclipse.core.internal.events.AutoBuildJob.run(AutoBuildJob.java:309)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+!SUBENTRY 1 org.eclipse.core.resources 4 272 2026-01-26 15:53:37.568
+!MESSAGE Resource already exists on disk: '/PDFReader/target/classes/com/example/PDFReader/controller/PdfController.java~'.
+!STACK 0
+java.lang.Exception: Resource already exists on disk: '/PDFReader/target/classes/com/example/PDFReader/controller/PdfController.java~'.
+	at org.eclipse.core.internal.resources.ResourceException.provideStackTrace(ResourceException.java:42)
+	at org.eclipse.core.internal.resources.ResourceException.<init>(ResourceException.java:38)
+	at org.eclipse.core.internal.localstore.FileSystemResourceManager.copy(FileSystemResourceManager.java:395)
+	at org.eclipse.core.internal.resources.Resource.copy(Resource.java:591)
+	at org.eclipse.jdt.internal.core.builder.AbstractImageBuilder.copyResource(AbstractImageBuilder.java:520)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:727)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:602)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.findSourceFiles(IncrementalImageBuilder.java:553)
+	at org.eclipse.jdt.internal.core.builder.IncrementalImageBuilder.build(IncrementalImageBuilder.java:137)
+	at org.eclipse.jdt.internal.core.builder.JavaBuilder.buildDeltas(JavaBuilder.java:330)
+	at org.eclipse.jdt.internal.core.builder.JavaBuilder.build(JavaBuilder.java:247)
+	at org.eclipse.core.internal.events.BuildManager$2.run(BuildManager.java:1109)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:47)
+	at org.eclipse.core.internal.events.BuildManager.basicBuild(BuildManager.java:299)
+	at org.eclipse.core.internal.events.BuildManager.basicBuild(BuildManager.java:355)
+	at org.eclipse.core.internal.events.BuildManager$1.run(BuildManager.java:449)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:47)
+	at org.eclipse.core.internal.events.BuildManager.basicBuild(BuildManager.java:452)
+	at org.eclipse.core.internal.events.BuildManager.basicBuildLoop(BuildManager.java:564)
+	at org.eclipse.core.internal.events.BuildManager.basicBuildLoop(BuildManager.java:512)
+	at org.eclipse.core.internal.events.BuildManager.build(BuildManager.java:594)
+	at org.eclipse.core.internal.events.AutoBuildJob.doBuild(AutoBuildJob.java:208)
+	at org.eclipse.core.internal.events.AutoBuildJob.run(AutoBuildJob.java:309)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:50.443
+!MESSAGE Converting html to markdown
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:53.461
+!MESSAGE Reconciled 1. Took 5 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:53.890
+!MESSAGE begin problem for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:53.891
+!MESSAGE 0 problems reported for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:53.909
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:53.909
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 09:10:53.910
+!MESSAGE Validated 2. Took 42 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:36.165
+!MESSAGE Reconciled 2. Took 0 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:36.595
+!MESSAGE begin problem for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:36.595
+!MESSAGE 0 problems reported for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:36.609
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:36.609
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:36.609
+!MESSAGE Validated 2. Took 37 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:38.223
+!MESSAGE Reconciled 2. Took 0 ms
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:38.712
+!MESSAGE begin problem for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:38.712
+!MESSAGE 0 problems reported for /PdfService.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:38.720
+!MESSAGE begin problem for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:38.720
+!MESSAGE 0 problems reported for /PdfController.java
+
+!ENTRY org.eclipse.jdt.ls.core 1 0 2026-01-27 15:10:38.720
+!MESSAGE Validated 2. Took 91 ms
