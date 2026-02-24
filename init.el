@@ -41,7 +41,7 @@
          ("C-c s p" . consult-ripgrep)
          ;; 2. 搜索当前项目的所有 Buffer
          ("C-c s b" . consult-project-buffer)
-         ;; 3. 极其强大的跳转功能
+         ;; 3. 跳转功能
          ("M-g g" . consult-goto-line)     ; 带预览的行跳转
          ("M-g m" . consult-mark)          ; 跳转到标记点
          ("M-g i" . consult-imenu)         ; 跳转到当前文件的函数/类定义 (Java/C++ 必备)

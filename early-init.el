@@ -1,6 +1,13 @@
 
 
 
+
+(setq package-archives '(("gnu". "https://elpa.gnu.org/packages/")
+			 ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+			 ("melpa-tuna"  . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+			 ("melpa" . "https://melpa.org/packages/")))
+
+
 ;; gc 设置 256MB，init处需要调低
 (setq gc-cons-threshold (* 256 1024 1024))
 
