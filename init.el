@@ -1,5 +1,4 @@
 
-;; 原生光标移动
 ;;===================
 ;; emacs init       |
 ;; Author: Ephemera |
@@ -134,8 +133,6 @@
   (setq flymake-suppress-zero-counters t))
 
 
-
-
 ;; modeline 美化
 (use-package doom-modeline
   :ensure t
@@ -175,15 +172,8 @@
 (global-set-key (kbd "<f2>") 'open-init-file)
 (global-set-key (kbd "<f5>") 'my/project-run)
 
-
-
-
 ;; ==== theme ====
 (load-theme 'modus-vivendi t)
-
-
-
-
 
 ;; 放在最后一行
 ;; 降低gc 防止占用过高
