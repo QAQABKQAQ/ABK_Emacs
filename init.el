@@ -4,15 +4,78 @@
 ;; Author: Ephemera |
 ;;===================
 
+
+
+
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+
+
+;; =====ENV=====
+
+
+
+
+
+;; =============
+
+
 (when (file-exists-p custom-file)
   (load custom-file))
 
 
+(use-package which-key
+  :ensure nil
+  :init
+  (which-key-mode)
+  :config
+  (which-key-add-key-based-replacements
+    ;; prefix labels: these show when you stop at C-c / M-g / C-x p
+    "C-c s" '("搜索" . "搜索相关命令")
+    "C-c !" '("诊断" . "诊断相关命令")
+    "C-c c" "快速记录任务(org-capture)"
+    "C-c a" "查看任务清单(org-agenda)"
+    "M-g" '("跳转" . "跳转相关命令")
+    "C-x p" '("项目" . "项目相关命令")
+    ;; leaf labels
+    "C-x s p" "项目全局搜索(consult-ripgrep)"
+    "C-x s b" "搜索当前项目的所有buffer(consult-project-buffer)"
+    "M-g g" "行跳转"
+    "M-g m" "跳转到标记点"
+    "M-g i" "跳转到当前文件的函数/定义"
+    "C-s" "替换原生搜索"
+    "M-o" "替换原生切换窗口M-o"
+    "C-x p f" "快速找项目内容文件"
+    "C-x p b" "只在项目buffer间切换"
+    "C-x p c" "项目根目录运行编辑"
+    "<C-return>" "补全"
+    "S-SPC" "模糊搜索"
+    "M-n" "下一个Error"
+    "M-p" "上一个Error"
+    "C-c ! l" "显示当前文件所有问题"
+    "M-." "跳转文档"
+    "M-," "返回"
+    "M-?" "查找引用"
+    "C-c r" "重命名符号"
+    "C-c h" "显示完整文档"))
+
+
+
+
+
 (use-package vertico
   :ensure t
+  :custom
+  (vertico-preselect 'directory)
   :init
   (vertico-mode))
+
+(use-package vertico-multiform
+  :ensure nil
+  :after vertico
+  :custom
+  (vertico-multiform-categories '((file (vertico-preselect . prompt))))
+  :init
+  (vertico-multiform-mode))
 
 (use-package orderless
   :ensure t
@@ -27,6 +90,16 @@
 (use-package ace-window
   :ensure t
   :bind ("M-o" . ace-window)) ; 替换原生的 M-o
+
+(use-package pdf-tools
+  :ensure t
+  :mode ("\\.pdf\\'" . pdf-view-mode)
+  :config
+  (pdf-tools-install))
+
+(use-package nov
+  :ensure t
+  :mode ("\\.epub\\'" . nov-mode))
 
 
 (use-package marginalia
@@ -48,6 +121,48 @@
          ("C-s" . consult-line))           ; 替换原生搜索，带实时预览
   :config
   (setq consult-preview-key 'any)) ; 实时预览
+
+(use-package org
+  :ensure nil
+  :bind (("C-c c" . org-capture)
+         ("C-c a" . org-agenda))
+  :init
+  (setq org-directory (expand-file-name "org" user-emacs-directory)
+        org-default-notes-file (expand-file-name "todo.org" org-directory)
+        org-agenda-files (list org-default-notes-file)
+        org-log-done 'time)
+  :config
+  (unless (file-directory-p org-directory)
+    (make-directory org-directory t))
+  (unless (file-exists-p org-default-notes-file)
+    (with-temp-file org-default-notes-file
+      (insert "#+title: Todo\n\n")))
+  (setq org-capture-templates
+        '(("t" "Todo" entry (file org-default-notes-file)
+           "* TODO %?\n%U\n"))))
+
+(use-package appt
+  :ensure nil
+  :after org
+  :init
+  (setq appt-message-warning-time 15
+        appt-display-interval 5
+        appt-display-mode-line t
+        appt-display-format 'window
+        appt-audible nil)
+  :config
+  (defun my/org-appt-refresh ()
+    "Refresh appointment reminders from Org agenda files."
+    (interactive)
+    (org-agenda-to-appt t))
+  (my/org-appt-refresh)
+  (appt-activate 1)
+  (add-hook 'org-finalize-agenda-hook #'my/org-appt-refresh)
+  (add-hook 'org-capture-after-finalize-hook #'my/org-appt-refresh)
+  (add-hook 'after-save-hook
+            (lambda ()
+              (when (derived-mode-p 'org-mode)
+                (my/org-appt-refresh)))))
 
 (use-package project
   :ensure nil ; 内置
@@ -77,6 +192,8 @@
  )
 
 
+
+
 (use-package rust-mode
   :ensure t
   :mode "\\.rs\\'"
@@ -93,13 +210,21 @@
          (go-mode . eglot-ensure)
          (c++-mode . eglot-ensure)
          (java-mode . eglot-ensure))
+  :bind(:map eglot-mode-map
+             ("M-." . xref-find-definitions)
+             ("M-," . xref-pop-marker-stack)
+             ("M-?" . xref-find-references)
+             ("C-c r" . eglot-rename)
+             ("C-c h" . eldoc-doc-buffer))
   :config
   ;; 自动格式化
   (add-hook 'before-save-hook 
             (lambda () 
               (when (eglot-managed-p) 
-                (eglot-format-buffer)))))
-
+                (eglot-format-buffer))))
+  (setq eldoc-echo-area-use-multiline-p t)
+  (setq eldoc-idle-delay 0.2)
+  (add-hook 'eglot-managed-mode-hook #'eldoc-mode))
 
 
 
@@ -126,7 +251,7 @@
   ;; 缩短 ElDoc (显示文档/报错) 的响应时间
   (setq eldoc-idle-delay 0.1)
   ;; 让报错信息显示得更完整，但不要让它自动撑开回显区高度
-  (setq eldoc-echo-area-use-multiline-p nil)
+  ;;(setq eldoc-echo-area-use-multiline-p nil)
   ;; 错误指示灯放在左侧边缘
   (setq flymake-fringe-indicator-position 'left-fringe)
   ;; 没有错误时不显示 0
