@@ -56,8 +56,20 @@
     "M-," "返回"
     "M-?" "查找引用"
     "C-c r" "重命名符号"
-    "C-c h" "显示完整文档"))
+    "C-c h" "查看当前函数文档"
+    "C-c d" "悬浮查看函数文档"))
 
+(use-package exec-path-from-shell
+  :ensure t
+  :config
+  (exec-path-from-shell-initialize)
+  (exec-path-from-shell-copy-envs
+   '("http_proxy" "https_proxy" "all_proxy" "HTTP_PROXY" "HTTPS_PROXY" "ALL_PROXY")))
+
+;; Git over SSH breaks in Emacs-launched shells unless we strip a few
+;; Emacs-specific env vars before delegating to the system ssh binary.
+(setenv "GIT_SSH_COMMAND"
+        (expand-file-name "~/.local/bin/git-ssh-clean-env"))
 
 
 
@@ -122,6 +134,24 @@
   :config
   (setq consult-preview-key 'any)) ; 实时预览
 
+(use-package treesit
+  :ensure nil
+  :init
+  (setq treesit-language-source-alist
+        '((typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
+  :config
+  (let ((grammar-dir (expand-file-name "tree-sitter" user-emacs-directory)))
+    (unless (file-directory-p grammar-dir)
+      (make-directory grammar-dir t))
+    (add-to-list 'treesit-extra-load-path grammar-dir))
+  (defun my/treesit-install-web-grammars ()
+    "Install missing tree-sitter grammars for TypeScript and TSX."
+    (interactive)
+    (dolist (lang '(typescript tsx))
+      (unless (treesit-language-available-p lang)
+        (treesit-install-language-grammar lang)))))
+
 (use-package org
   :ensure nil
   :bind (("C-c c" . org-capture)
@@ -132,6 +162,8 @@
         org-agenda-files (list org-default-notes-file)
         org-log-done 'time)
   :config
+  ;; Enable `<s TAB` style easy templates in Org buffers.
+  (require 'org-tempo)
   (unless (file-directory-p org-directory)
     (make-directory org-directory t))
   (unless (file-exists-p org-default-notes-file)
@@ -209,7 +241,9 @@
          (rust-mode . eglot-ensure)
          (go-mode . eglot-ensure)
          (c++-mode . eglot-ensure)
-         (java-mode . eglot-ensure))
+         (java-mode . eglot-ensure)
+         (typescript-ts-mode . eglot-ensure)
+         (tsx-ts-mode . eglot-ensure))
   :bind(:map eglot-mode-map
              ("M-." . xref-find-definitions)
              ("M-," . xref-pop-marker-stack)
@@ -225,6 +259,20 @@
   (setq eldoc-echo-area-use-multiline-p t)
   (setq eldoc-idle-delay 0.2)
   (add-hook 'eglot-managed-mode-hook #'eldoc-mode))
+
+(let ((eldoc-box-dir (expand-file-name "site-lisp/eldoc-box" user-emacs-directory)))
+  (when (file-directory-p eldoc-box-dir)
+    (add-to-list 'load-path eldoc-box-dir)))
+
+(use-package eldoc-box
+  :if (locate-library "eldoc-box")
+  :ensure nil
+  :after eglot
+  :bind (:map eglot-mode-map
+              ("C-c d" . eldoc-box-help-at-point))
+  :hook (eglot-managed-mode . eldoc-box-hover-mode)
+  :custom
+  (eldoc-box-only-multi-line nil))
 
 
 
@@ -270,12 +318,145 @@
   (doom-modeline-buffer-file-name-style 'truncate-with-project)) ; 智能显示路径
 
 
+;; === vterm terminal ===
+(use-package vterm
+  :ensure t
+  :custom
+  (setq vterm-kill-buffer-on-exit t)
+  (setq vterm-shell "/bin/zsh")
+  (pixel-scroll-precision-mode 1))
+
+
 ;; === Git ===
 (use-package magit
   :ensure t
   :bind (("C-x g" . magit-status))
   :config
   (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
+
+;; ==== mail ====
+;; ==== mail ====
+(use-package mu4e
+  :ensure nil
+  :load-path "/opt/homebrew/opt/mu/share/emacs/site-lisp/mu/mu4e"
+  :bind (("C-c m" . mu4e))
+  :init
+  (require 'seq)
+
+  (defconst my/mu4e-proton-domains
+    '("albamkin.top" "proton.me" "protonmail.com" "pm.me"))
+
+  (defun my/mu4e-message-text (msg field)
+    (when msg
+      (let ((value (mu4e-message-field msg field)))
+        (cond
+         ((stringp value) value)
+         (value (prin1-to-string value))
+         (t "")))))
+
+  (defun my/mu4e-compose-from ()
+    (when (and (derived-mode-p 'message-mode)
+               (fboundp 'message-field-value))
+      (or (ignore-errors (message-field-value "From")) "")))
+
+  (defun my/mu4e-proton-message-p (&optional msg)
+    (let ((text (downcase (mapconcat #'identity
+                                     (list (or (my/mu4e-compose-from) "")
+                                           (my/mu4e-message-text msg :maildir)
+                                           (my/mu4e-message-text msg :from)
+                                           (my/mu4e-message-text msg :to)
+                                           (my/mu4e-message-text msg :cc))
+                                     " "))))
+      (or (string-prefix-p "/albamkin-top/" (my/mu4e-message-text msg :maildir))
+          (seq-some (lambda (domain)
+                      (string-match-p (concat "@" (regexp-quote domain) "\\_>") text))
+                    my/mu4e-proton-domains))))
+
+  (defun my/mu4e-folder (kind &optional msg)
+    (let ((proton (my/mu4e-proton-message-p msg)))
+      (pcase kind
+        ('drafts (if proton "/albamkin-top/Drafts" "/gmail/[Gmail]/草稿"))
+        ('sent   (if proton "/albamkin-top/Sent" "/gmail/[Gmail]/已发邮件"))
+        ('trash  (if proton "/albamkin-top/Trash" "/gmail/[Gmail]/已删除邮件"))
+        ('refile (if proton "/albamkin-top/Archive" "/gmail/[Gmail]/所有邮件")))))
+
+  (defun my/mu4e-sent-messages-behavior ()
+    (if (my/mu4e-proton-message-p) 'delete 'sent))
+
+  (setq mu4e-maildir "~/Maildir"
+        mu4e-get-mail-command "mbsync gmail albamkin-top"
+        mu4e-update-interval nil
+        mu4e-change-filenames-when-moving t
+        mu4e-view-auto-mark-as-read nil
+        mu4e-view-show-images t
+        mu4e-view-show-addresses t
+        mu4e-headers-results-limit 200
+        mu4e-drafts-folder (lambda (msg) (my/mu4e-folder 'drafts msg))
+        mu4e-sent-folder (lambda (msg) (my/mu4e-folder 'sent msg))
+        mu4e-trash-folder (lambda (msg) (my/mu4e-folder 'trash msg))
+        mu4e-refile-folder (lambda (msg) (my/mu4e-folder 'refile msg))
+        mu4e-sent-messages-behavior #'my/mu4e-sent-messages-behavior
+        ;; 常用快捷入口
+        mu4e-maildir-shortcuts
+        '((:maildir "/gmail/INBOX" :name "Inbox" :key ?i)
+          (:maildir "/gmail/Later" :name "Later" :key ?l)
+          (:maildir "/gmail/[Gmail]/已发邮件" :name "Sent" :key ?s)
+          (:maildir "/gmail/[Gmail]/草稿" :name "Drafts" :key ?d)
+          (:maildir "/gmail/[Gmail]/已删除邮件" :name "Trash" :key ?t)
+          (:maildir "/gmail/[Gmail]/所有邮件" :name "Archive" :key ?a)
+          (:maildir "/albamkin-top/INBOX" :name "Top Inbox" :key ?I)
+          (:maildir "/albamkin-top/Sent" :name "Top Sent" :key ?S)
+          (:maildir "/albamkin-top/Drafts" :name "Top Drafts" :key ?D)
+          (:maildir "/albamkin-top/Trash" :name "Top Trash" :key ?T)
+          (:maildir "/albamkin-top/Archive" :name "Top Archive" :key ?A))
+        ;; 主界面搜索书签
+        mu4e-bookmarks
+        '((:name "Inbox" :query "maildir:/gmail/INBOX" :key ?i)
+          (:name "Top Inbox" :query "maildir:/albamkin-top/INBOX" :key ?I)
+          (:name "Unread" :query "flag:unread" :key ?u)
+          (:name "Archive" :query "maildir:/gmail/[Gmail]/所有邮件" :key ?a)
+          (:name "Top Archive" :query "maildir:/albamkin-top/Archive" :key ?A)
+          (:name "Sent" :query "(maildir:/gmail/[Gmail]/已发邮件 OR maildir:/albamkin-top/Sent)" :key ?s)
+          (:name "Top Sent" :query "maildir:/albamkin-top/Sent" :key ?S)))
+  :config
+  (setq mu4e-context-policy 'pick-first
+        mu4e-compose-context-policy 'ask-if-none
+        mu4e-contexts
+        (list
+         (make-mu4e-context
+          :name "gmail"
+          :match-func (lambda (msg)
+                        (and msg
+                             (string-prefix-p "/gmail/"
+                                              (my/mu4e-message-text msg :maildir))))
+          :vars '((user-mail-address . "albamkin@gmail.com")
+                  (user-full-name . "albamkin")))
+         (make-mu4e-context
+          :name "albamkin.top"
+          :match-func #'my/mu4e-proton-message-p
+          :vars '((user-mail-address . "albamkin@albamkin.top")
+                  (user-full-name . "albamkin"))))))
+
+(use-package smtpmail
+  :ensure nil
+  :after mu4e
+  :config
+  (setq user-full-name "albamkin"
+        user-mail-address "albamkin@gmail.com"
+        send-mail-function 'sendmail-send-it
+        message-send-mail-function 'sendmail-send-it
+        sendmail-program (or (executable-find "https-mail-relay-sendmail")
+                             (expand-file-name "~/.local/bin/https-mail-relay-sendmail"))
+        message-sendmail-extra-arguments '("--read-envelope-from" "-t")
+        message-sendmail-f-is-evil t
+        mail-specify-envelope-from t
+        mail-envelope-from 'header))
+(use-package server
+  :ensure nil
+  :config
+  (unless (server-running-p)
+    (server-start)))
+
 
 ;; ==== defun ====
 (defun open-init-file()
@@ -292,6 +473,12 @@
      ((file-exists-p "pom.xml")    (compile "mvn exec:java"))
      ((file-exists-p "Makefile")   (compile "make -k"))
      (t (call-interactively 'compile)))))
+
+
+
+
+
+
 
 ;; ==== key ====
 (global-set-key (kbd "<f2>") 'open-init-file)

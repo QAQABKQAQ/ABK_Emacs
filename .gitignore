@@ -39,3 +39,5 @@ eclipse.jdt.ls/
 # 版本控制
 .jj/
 auto-save-list/
+/eshell/
+/site-lisp/
