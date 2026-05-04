@@ -57,7 +57,8 @@
     "M-?" "查找引用"
     "C-c r" "重命名符号"
     "C-c h" "查看当前函数文档"
-    "C-c d" "悬浮查看函数文档"))
+    "C-c d" "悬浮查看函数文档"
+    "C-c m" "打开邮箱"))
 
 (use-package exec-path-from-shell
   :ensure t
