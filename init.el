@@ -38,6 +38,7 @@
     "C-x p" '("项目" . "项目相关命令")
     ;; leaf labels
     "C-x s p" "项目全局搜索(consult-ripgrep)"
+    "M-;" "注释"
     "C-x s b" "搜索当前项目的所有buffer(consult-project-buffer)"
     "M-g g" "行跳转"
     "M-g m" "跳转到标记点"
@@ -57,7 +58,8 @@
     "M-?" "查找引用"
     "C-c r" "重命名符号"
     "C-c h" "查看当前函数文档"
-    "C-c d" "悬浮查看函数文档"
+    "C-c f" "手动格式化当前buffer"
+    "C-c d" "切换悬浮函数文档"
     "C-c m" "打开邮箱"))
 
 (use-package exec-path-from-shell
@@ -139,19 +141,28 @@
   :ensure nil
   :init
   (setq treesit-language-source-alist
-        '((typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+        '((javascript "https://github.com/tree-sitter/tree-sitter-javascript")
+          (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
           (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
   :config
   (let ((grammar-dir (expand-file-name "tree-sitter" user-emacs-directory)))
     (unless (file-directory-p grammar-dir)
       (make-directory grammar-dir t))
     (add-to-list 'treesit-extra-load-path grammar-dir))
+
+  (setq major-mode-remap-alist
+        '((js-mode . js-ts-mode)
+          (javascript-mode . js-ts-mode)
+          (typescript-mode . typescript-ts-mode)
+          (tsx-mode . tsx-ts-mode)))
+
   (defun my/treesit-install-web-grammars ()
-    "Install missing tree-sitter grammars for TypeScript and TSX."
+    "Install missing tree-sitter grammars for JS, TS and TSX."
     (interactive)
-    (dolist (lang '(typescript tsx))
+    (dolist (lang '(javascript typescript tsx))
       (unless (treesit-language-available-p lang)
         (treesit-install-language-grammar lang)))))
+
 
 (use-package org
   :ensure nil
@@ -203,6 +214,64 @@
          ("C-x p b" . project-switch-to-buffer) ; 只在项目 Buffer 间切换
          ("C-x p c" . project-compile)))   ; 在项目根目录运行编译
 
+(defconst my/code-indent-width 8
+  "Preferred indentation width for programming modes.")
+
+(defun my/set-code-indent-width ()
+  "Apply `my/code-indent-width' to the current programming buffer."
+  (setq-local indent-tabs-mode nil)
+  (setq-local tab-width my/code-indent-width)
+  (setq-local standard-indent my/code-indent-width)
+  (dolist (sym '(c-basic-offset
+                 js-indent-level
+                 js-switch-indent-offset
+                 typescript-ts-mode-indent-offset
+                 treesit-simple-indent-offset
+                 rust-indent-offset
+                 rust-ts-mode-indent-offset
+                 go-ts-mode-indent-offset
+                 css-indent-offset
+                 sh-basic-offset
+                 python-indent-offset))
+    (when (boundp sym)
+      (set (make-local-variable sym) my/code-indent-width)))
+  (when (derived-mode-p 'emacs-lisp-mode 'lisp-mode 'lisp-interaction-mode)
+    (setq-local lisp-body-indent my/code-indent-width)
+    (setq-local lisp-indent-offset my/code-indent-width)))
+
+(add-hook 'prog-mode-hook #'my/set-code-indent-width)
+
+(dolist (buffer (buffer-list))
+  (with-current-buffer buffer
+    (when (derived-mode-p 'prog-mode)
+      (my/set-code-indent-width))))
+
+(defun my/format-buffer ()
+  "Format current buffer on demand.
+
+Use LSP formatting in Eglot-managed buffers; otherwise reindent the whole
+buffer with the current major mode's indentation rules."
+  (interactive)
+  (if (and (fboundp 'eglot-managed-p)
+           (eglot-managed-p))
+      (eglot-format-buffer)
+    (indent-region (point-min) (point-max))))
+
+(global-set-key (kbd "C-c f") #'my/format-buffer)
+
+(defvar my/eglot-format-on-save-modes nil
+  "Major modes where Eglot may format automatically before saving.
+
+Keep this nil by default so saving never rewrites code unless a language is
+explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
+
+(defun my/eglot-format-on-save ()
+  "Format the current buffer before saving when its mode is explicitly opted in."
+  (when (and (fboundp 'eglot-managed-p)
+             (eglot-managed-p)
+             (memq major-mode my/eglot-format-on-save-modes))
+    (eglot-format-buffer)))
+
 (use-package corfu
   :ensure t
   :init
@@ -240,9 +309,12 @@
   :ensure nil
   :hook ((rust-ts-mode . eglot-ensure)
          (rust-mode . eglot-ensure)
-         (go-mode . eglot-ensure)
+         (c-mode . eglot-ensure)
          (c++-mode . eglot-ensure)
+         (go-mode . eglot-ensure)
          (java-mode . eglot-ensure)
+         (js-ts-mode . eglot-ensure)
+         (js-mode . eglot-ensure)
          (typescript-ts-mode . eglot-ensure)
          (tsx-ts-mode . eglot-ensure))
   :bind(:map eglot-mode-map
@@ -250,13 +322,10 @@
              ("M-," . xref-pop-marker-stack)
              ("M-?" . xref-find-references)
              ("C-c r" . eglot-rename)
-             ("C-c h" . eldoc-doc-buffer))
+             ("C-c h" . eldoc-doc-buffer)
+             ("C-c f" . my/format-buffer))
   :config
-  ;; 自动格式化
-  (add-hook 'before-save-hook 
-            (lambda () 
-              (when (eglot-managed-p) 
-                (eglot-format-buffer))))
+  (add-hook 'before-save-hook #'my/eglot-format-on-save)
   (setq eldoc-echo-area-use-multiline-p t)
   (setq eldoc-idle-delay 0.2)
   (add-hook 'eglot-managed-mode-hook #'eldoc-mode))
@@ -270,10 +339,16 @@
   :ensure nil
   :after eglot
   :bind (:map eglot-mode-map
-              ("C-c d" . eldoc-box-help-at-point))
-  :hook (eglot-managed-mode . eldoc-box-hover-mode)
+              ("C-c d" . my/eldoc-box-toggle-help-at-point))
   :custom
-  (eldoc-box-only-multi-line nil))
+  (eldoc-box-only-multi-line nil)
+  :config
+  (defun my/eldoc-box-toggle-help-at-point ()
+    "Toggle the Eldoc childframe for the symbol at point."
+    (interactive)
+    (if (eldoc-box--frame-visible-p)
+        (eldoc-box-quit-frame)
+      (eldoc-box-help-at-point))))
 
 
 

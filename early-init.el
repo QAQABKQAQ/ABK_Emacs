@@ -29,8 +29,9 @@
 
 (global-hl-line-mode 1) ;高亮当前行
 (delete-selection-mode 1) ; 选中内容后输入可直接替换
-(setq-default indent-tabs-mode nil) ; 使用空格缩进 
-(setq-default tab-width 4) ; 缩进宽度为 4
+(setq-default indent-tabs-mode nil ; 使用空格缩进
+              tab-width 8 ; 缩进宽度为 8
+              standard-indent 8)
 
 (electric-pair-mode t) ;补全括号
 (show-paren-mode t) ; 高亮匹配内容
@@ -44,25 +45,38 @@
 
 ;;====font====
 
-;; 设置字体
-;; 英文字体:https://monaspace.githubnext.com/
-;; 中文字体:https://github.com/lxgw/LxgwWenKai
+;; Maple Mono NF CN: https://font.subf.dev/en/
 (defun my/apply-font-config ()
   (interactive)
   (when (display-graphic-p)
 
     (set-face-attribute 'default nil
-			:family "Monaspace Neon"
+			:family "Maple Mono NF CN"
 			:height 140
-			:weight 'normal
+			:weight 'bold
+			:slant 'italic
 			)
     (dolist (charset '(kana han symbol cjk-misc bopomofo))
-      (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono")))
-    (setq face-font-rescale-alist '(("LXGW WenKai Mono" . 1.25))))
+      (set-fontset-font t charset (font-spec :family "Maple Mono NF CN")))
+    (setq face-font-rescale-alist '(("Maple Mono NF CN" . 1.0))))
   )
+
+;; 旧字体配置 (保留备用)
+;; 英文字体:https://monaspace.githubnext.com/
+;; 中文字体:https://github.com/lxgw/LxgwWenKai
+;; (defun my/apply-font-config ()
+;;   (interactive)
+;;   (when (display-graphic-p)
+;;     (set-face-attribute 'default nil
+;; 			:family "Monaspace Neon"
+;; 			:height 140
+;; 			:weight 'normal
+;; 			)
+;;     (dolist (charset '(kana han symbol cjk-misc bopomofo))
+;;       (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono")))
+;;     (setq face-font-rescale-alist '(("LXGW WenKai Mono" . 1.25))))
+;;   )
 
 (if (daemonp)
     (add-hook 'server-after-make-frame-hook #'my/apply-font-config)
   (add-hook 'window-setup-hook #'my/apply-font-config))
-
-
