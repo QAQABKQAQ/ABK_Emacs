@@ -1,0 +1,525 @@
+#+TITLE: alynx-emacsd 精读笔记
+#+SUBTITLE: 从 AlynxZhou 的配置里挑出值得借鉴的设计，逐段中文讲解
+#+STARTUP: overview
+#+OPTIONS: toc:2 num:t
+
+* 前言
+
+这份笔记精读 =~/Programming/learn_project/alynx-emacsd= （作者 AlynxZhou），
+挑出其中设计最讲究、最值得偷师的片段，逐段配上中文讲解。
+
+先摆正心态：*你的配置和他的是同级别，不是师徒关系*。你们共用同一套 DNA——
+=package.el= + =use-package=、Vertico/Consult/Orderless/Marginalia 补全栈、
+清华镜像、两段式 GC、=read-process-output-max= 调优，甚至「按 major-mode 归一
+缩进宽度」和「多语言一键运行」你俩都各自写过。你在 magit、mu4e 邮件、vterm、
+pdf/epub 阅读上还领先他；他把手写 modeline 和主题堆到 1500 行，你用
+doom-modeline + modus 省掉了。
+
+所以他真正值得学的，是 *设计纪律* 和 *注释质量*，不是「他有你没有的功能」。
+下面每一节都遵循「他的代码 → 为什么这样设计好 → 你的配置能怎么用」的结构。
+
+每节标题后标注了源文件与行号，方便对照原文。
+
+* 总览：值得借鉴的设计
+
+| # | 主题 | 源位置 | 一句话 |
+|---+------+--------+--------|
+| 1 | 启动优化 | early-init.el | 把「必须在 GUI 之前做的事」和「其余」彻底分开 |
+| 2 | 包管理哲学 | init.el:715 | 只调 =package-activate-all=，永不调 =package-initialize= |
+| 3 | 缩进三轴模型 | init.el:164 | 把 tab/offset/tab-width 三个正交概念拆开——招牌设计 |
+| 4 | 字体与 CJK 回退 | init.el:68 | daemon 下逐帧重设 fontset，修掉 emacsclient 字体 bug |
+| 5 | 模式行状态缓存 | mode-line.el:465 | VC/报错状态缓存在 buffer-local，重绘只读字符串 |
+| 6 | =.local/= 重定向 | init.el:37 | 所有运行时垃圾集中到一个目录，仓库保持干净 |
+| 7 | key-translation-map | init.el:533 | 翻译「按键事件」而非重绑函数 |
+| 8 | 小工具命令 | init.el:572 | sibling-file、smarter-C-a、open-line…零依赖顺手命令 |
+| 9 | =:defer= 纪律 | init.el:776 | 把「什么时候加载」从玄学变成成文规则 |
+| 10 | 注释哲学 | unused.el | 保留被否决的方案 + 每个决定都写清 WHY |
+
+* 1. 启动优化：early-init.el 的每一行
+
+=early-init.el= 在 GUI 出现之前运行。他的原则写在 Commentary 里：*只放「真正
+必须在 GUI 前做」的事*，其余一律留给 =init.el=。整个文件只有 100 行，但每一段
+都有明确理由。
+
+** 两段式 GC + LSP 吞吐
+
+#+begin_src emacs-lisp
+;; 默认 800KB 太小，启动期把阈值抬到 128MB，减少 GC 次数。单位是字节。
+(setq gc-cons-threshold (* 128 1024 1024))
+;; LSP 会一次性吐大块 JSON，把单次读取上限抬到 2MB，避免反复进读循环。
+(setq read-process-output-max (* 2 1024 1024))
+;; 启动完成后再把阈值降到 16MB（Doom 的默认值），
+;; 让日常使用时 GC 停顿更短、更均匀。
+(add-hook 'emacs-startup-hook (lambda ()
+                                (setq gc-cons-threshold (* 16 1024 1024))))
+#+end_src
+
+*为什么好*：启动期「用空间换时间」（少 GC → 启动快），启动后「用时间换手感」
+（阈值调低 → 单次 GC 短 → 不卡）。这是社区公认的正确做法。
+
+*你的配置*：你已经在做同一件事（256MB→100MB）。唯一区别是你把 100MB 的
+理由写在了注释里（「16MB 在重负载下 GC 过于频繁」），比他更贴合你自己的机器——
+这点你做得更好，保持。注意 =read-process-output-max= 你在 early-init 和 init
+里各设了一次，去重掉一处即可。
+
+** 防白屏：GUI 出现前就把 default face 染成主题色
+
+#+begin_src emacs-lisp
+;; 在窗口显示前就把 default face 设成 One Dark 的颜色，避免启动瞬间白屏闪烁。
+;; 这些值要跟当前主题保持同步。
+(set-face-attribute 'default nil
+                    :family "Monaco" :height 140
+                    :foreground "#ABB2BF" :background "#282C34")
+;; 自定义 modeline 加载前，先把丑陋的默认 modeline 藏掉。
+(setq-default mode-line-format nil)
+#+end_src
+
+*为什么好*：主题是在 =init.el= 里才加载的，中间有个时间窗口 Emacs 会用默认
+（白底）配色画第一帧，肉眼可见地「闪一下白」。提前把 =default= face 的前景/背景
+硬编码成主题色，这一帧就不白了。代价是「主题换色时要记得同步这几个值」——他也
+在注释里老实写了这句提醒。
+
+*你的配置*：你用 =modus-vivendi=，可以照搬这招——在 early-init 里把
+=default= 的 =:background= 设成 modus-vivendi 的背景色（=#000000= 或你调过的
+值），=mode-line-format= 设 nil 藏掉默认 modeline 到 doom-modeline 接管为止。
+
+** 其余启动期设置
+
+#+begin_src emacs-lisp
+;; 别在这个早期阶段 resize frame。
+(setq frame-inhibit-implied-resize t)
+;; 按像素而非字符 resize（Wayland 不支持按字符），保证初始最大化能铺满屏幕。
+(setq frame-resize-pixelwise t)
+;; macOS：透明标题栏 + 隐藏代理图标和标题文字。
+(when (featurep 'ns)
+  (setq ns-use-proxy-icon nil)
+  (setq frame-title-format nil)
+  (modify-all-frames-parameters '((ns-transparent-titlebar . t))))
+;; 关键：Emacs 27 起会在 early-init 和 init 之间自动调用 package-activate-all，
+;; 想在 init 里自己控制包加载，就得先在这里把它关掉。
+(setq package-enable-at-startup nil)
+#+end_src
+
+最后一行是第 2 节的前提，见下。
+
+* 2. 包管理哲学：package-activate-all vs package-initialize
+
+=init.el:715= 有一整段关于「到底该调哪个函数」的考据，值得完整读。核心结论：
+
+#+begin_src emacs-lisp
+;; 自 Emacs 27.1 起，老的 package-initialize 被拆成两部分：
+;;   - package-initialize：加载所有包的全部 lisp 文件（昂贵），并调 activate-all
+;;   - package-activate-all：只加载所有包的 autoload（便宜）
+;;
+;; 所以你只需要 package-activate-all，真正的包会在你调用它们时由 autoload 按需
+;; 加载。任何叫你在 Emacs 27.1 之前那样写 package-initialize 的文章都过时了。
+(setq package-quickstart t)
+(setq package-quickstart-file
+      (locate-user-emacs-file ".local/cache/package-quickstart.el"))
+(unless (file-exists-p package-quickstart-file)
+  (package-quickstart-refresh))
+;; 包菜单里做完升级等操作后，自动刷新 quickstart 缓存。
+(advice-add 'package-menu-execute :after-while #'package-quickstart-refresh)
+
+(package-activate-all)
+#+end_src
+
+*为什么好*：
+- =package-activate-all= 只读 autoload，很便宜；=package-initialize= 会把每个
+  包的所有 =.el= 都 load 进来，很贵。分清这两者，是「启动是否磨蹭」的分水岭。
+- =package-quickstart= 把所有 autoload 拼进一个文件，=activate-all= 直接读这
+  一个文件而非几十个碎文件（他实测只快 0.1s，但 HDD 用户收益更大）。
+
+** 为什么不开 use-package-always-ensure
+
+#+begin_src emacs-lisp
+;; 给 use-package-always-ensure 设 t 会连内置包也加上 :ensure t。
+;; 但你永远不该给内置包写 :ensure t——在用 package-activate-all（而非
+;; package-initialize）时它会把事情搞乱。
+;; (setq use-package-always-ensure t)   ; ← 他故意注释掉不开
+#+end_src
+
+*你的配置*：你也没开 =use-package-always-ensure=，对外部包显式写 =:ensure t=、
+内置/vendored 写 =:ensure nil=——和他完全一致，做得对，保持。
+可以考虑补上的是 =package-quickstart=（启动再快一点）和显式的
+=package-enable-at-startup nil= + =package-activate-all=（把加载时机攥在自己
+手里）。⚠️ 另外你的 =custom.el= 里 =package-selected-packages= 是 =nil=，意味着
+=M-x package-autoremove= 会认为「一个包都不需要」而全删——在你把这个列表填好
+之前，别跑 =package-autoremove=。
+
+* 3. 缩进三轴模型（招牌设计）
+
+这是整份配置最见功力的地方（=init.el:164-503=）。他把大多数编辑器混为一谈的
+*三个正交概念* 干净地拆开了：
+
+#+begin_src emacs-lisp
+;; 让 tab 显示成 8 以外的宽度，就像把 π 定义成 3。你要是不想要 8，
+;; 就该用空格而不是 tab。
+(setq-default tab-width 8)
+;; indent-tabs-mode 不是「只用 tab」的意思：它是说——缩进级别能被 tab-width
+;; 整除的部分用 tab，剩下的零头用空格。
+(setq-default indent-tabs-mode t)
+#+end_src
+
+三轴分别是：
+1. =indent-tabs-mode=：用 tab 还是空格；
+2. =indent-offset=：每一级缩进多少（每个 major-mode 变量名都不同，如
+   =c-basic-offset=、=python-indent-offset=）；
+3. =tab-width=：一个 tab *显示* 多宽——他的立场是「永远 8」。
+
+** 一张数据表统管所有 mode 的 offset 变量
+
+#+begin_src emacs-lisp
+(defconst alynx/mode-indent-offsets
+  '((c-mode          c-basic-offset)
+    (c-ts-mode       c-ts-mode-indent-offset)
+    (java-mode       c-basic-offset)
+    (js-mode         js-indent-level)
+    (python-ts-mode  python-indent-offset)
+    (rust-mode       rust-indent-offset)
+    (typescript-ts-mode typescript-ts-mode-indent-offset)
+    ;; ……共约 90 个 mode，有的 mode 有多个 offset 变量，会全部一起设……
+    (web-mode        web-mode-attr-indent-offset
+                     web-mode-code-indent-offset
+                     web-mode-markup-indent-offset))
+  "各 major-mode 的缩进 offset 变量。若某 mode 有多个，会按顺序全部设置。")
+
+(defun set-indent-offset (num)
+  "把当前 buffer 的缩进 offset 设为 NUM。NUM 为负则设为 nil。"
+  (interactive `(,(read-number "Indent offset (chars): ")))
+  (dolist (mode-indent-offset (alynx/get-mode-indent-offsets))
+    (make-local-variable mode-indent-offset)   ; set 不像 setq 会自动本地化
+    (if (< num 0) (set mode-indent-offset nil)
+      (set mode-indent-offset num))))
+
+(defun indent-tabs (num)   ; 一句话切成「tab 缩进 + offset=num」
+  (interactive `(,(read-number "Indent offset (chars): ")))
+  (indent-tabs-mode 1) (set-indent-offset num))
+
+(defun indent-spaces (num) ; 一句话切成「空格缩进 + offset=num」
+  (interactive `(,(read-number "Indent offset (chars): ")))
+  (indent-tabs-mode -1) (set-indent-offset num))
+#+end_src
+
+*为什么好*：把「90 个 mode 各自叫什么 offset 变量」这件脏活收进 *一张数据表*，
+所有操作（设 offset、切 tab/空格）都基于这张表，新增语言只加一行。这是「数据
+驱动」而非「散落一地的 setq」的教科书写法。
+
+** guess-indent：老实交代失败模式的自动探测
+
+#+begin_src emacs-lisp
+;; 这个函数不完美，它基于一个假设：「若文件用空格缩进，则行首从不出现 tab，
+;; 且除 0 和 1 以外最短的空格前缀长度就是 indent offset」。
+;; 它处理不了「先用 tab 缩进、又用空格对齐函数参数」这种情况……
+;; 总之它只是猜，猜错了用户手动纠正即可。
+(defun guess-indent ()
+  "扫描前 200 行，猜出并设置缩进风格与 offset。"
+  (interactive)
+  ;; ……扫描前 min(总行数,200) 行，记录是否出现过 tab、以及最短的（≥2）空格前缀……
+  (if has-tab
+      (if (/= shortest-spaces 0) (indent-tabs shortest-spaces)
+        (indent-tabs tab-width))
+    (when (/= shortest-spaces 0) (indent-spaces shortest-spaces))))
+#+end_src
+
+*为什么好*：不是「假装能 100% 猜对」，而是 *把失败模式一条条写在注释里*
+（GTK 那种 2 空格 offset 配 tab 的坑、对齐参数导致误判的坑）。诚实胜过聪明。
+
+** 用 change-major-mode-after-body-hook 卡在正确时机
+
+#+begin_src emacs-lisp
+;; 不给每个 mode 单独加 hook，而是用 change-major-mode-after-body-hook：
+;; Emacs 切 major-mode 时先跑它 → 我们设默认值 → 再 guess-indent →
+;; 然后项目的 .editorconfig 加载 → 再 .dir-locals.el → 最后 after-change-major-mode-hook。
+;; 这样 editorconfig/dir-locals 能正确覆盖我们的默认值。
+(add-hook 'change-major-mode-after-body-hook 'guess-indent)
+#+end_src
+
+*为什么好*：时机选得准。默认值和猜测要发生在 =.editorconfig= / =.dir-locals.el=
+*之前*，这样项目级配置能压过全局默认——顺序错了就会「项目说 2 空格，你的全局
+却把它掰回 8」。
+
+*你的配置*：你已有 =my/set-code-indent-width=（把一票 offset 变量统一设成 8，
+并回填已开的 buffer），思路一致、够用。若想进一步，可借鉴两点：①把「tab vs
+offset vs tab-width」显式分成三轴，语义更清楚；② =guess-indent= 那种「进新项目
+自动跟随其缩进」的能力，配合 =editorconfig= 包会很省心。
+
+* 4. 字体与 CJK 回退：daemon 安全的 fontset
+
+中英文混排 + daemon 模式，是 Emacs 字体配置的经典雷区。他的处理（=init.el:68=）
+是正确解法。
+
+#+begin_src emacs-lisp
+;; 把 CJK / emoji 的回退字体设进 fontset。Emacs 不用 FontConfig 直接管回退，
+;; 而是有个叫 fontset 的东西，且要按 charset 分别设置。
+(defun alynx/clear-and-set-fallback-fonts ()
+  (dolist (charset '(han kana hangul symbol cjk-misc bopomofo))
+    (set-fontset-font t charset nil)                         ; 先清空该 charset
+    (set-fontset-font t charset (font-spec :family "Apple Color Emoji") nil 'prepend)
+    (set-fontset-font t charset (font-spec :family "PingFang SC")       nil 'prepend)
+    (set-fontset-font t charset (font-spec :family "Monaco")            nil 'prepend)))
+
+;; HACK：直接设回退字体对 emacsclient 无效——client 起 daemon 时还没有 GUI，
+;; 字体设置被忽略。所以 daemon 下要在每次「建帧之后」再设一遍。
+(if (daemonp)
+    (add-hook 'after-make-frame-functions
+              (lambda (frame)
+                (select-frame frame)
+                (alynx/clear-and-set-fallback-fonts)))
+  (alynx/clear-and-set-fallback-fonts))
+
+;; PingFang SC 比 Monaco 高，缩放对齐一下，避免行高被撑大。
+(setq face-font-rescale-alist '(("PingFang SC" . 0.9)))
+#+end_src
+
+*为什么好*：
+- 三个要点都踩中了：①按 charset 逐个设 =set-fontset-font=（不是设一个默认就完
+  事）；② =daemonp= 分支——emacsclient 的第一帧没有 GUI，字体设置会被丢弃，必须
+  挂 =after-make-frame-functions= 逐帧补设；③ =face-font-rescale-alist= 把中文
+  字体缩放到和西文对齐，解决「中文比英文高、行距被撑大」。
+- 每个坑都配了外部链接（casouri 的字体笔记、Reddit 讨论、他自己 patch 字体的仓库）。
+
+*你的配置*：你已经在 =server-after-make-frame-hook= / =window-setup-hook= 上做了
+daemon 安全的字体设置，方向对。可补的细节是 =face-font-rescale-alist=——你用
+Maple Mono NF CN，如果偶尔觉得中英文基线/行高不齐，就是这个在起作用。
+
+* 5. 自定义模式行：状态缓存，避免每次重绘重算
+
+你用 doom-modeline，不必抄他这 787 行手写 modeline。但其中的 *性能思路* 值得懂——
+这正是 doom-modeline 内部替你做的事。
+
+** 把 VC 状态缓存进 buffer-local，重绘只读字符串
+
+#+begin_src emacs-lisp
+(defvar-local alynx-mode-line--vc-text nil)   ; 缓存在 buffer-local 变量里
+
+;; 只在这些时机重算 VC 状态，算完存进上面的变量。
+(defun alynx-mode-line--vc-update-segment (&rest _)
+  (setq alynx-mode-line--vc-text
+        (when (and vc-mode buffer-file-name)
+          ;; ……根据 vc-state 选颜色和图标，拼成带 face 的字符串……
+          )))
+
+;; modeline 的 :eval 段只是「返回缓存好的字符串」，不做任何计算。
+(defun alynx-mode-line--segment-vc () alynx-mode-line--vc-text)
+
+;; 在 activate 时，把「重算」挂到真正会改变状态的 hook / advice 上：
+(add-hook 'find-file-hook   #'alynx-mode-line--vc-update-segment)
+(add-hook 'after-save-hook  #'alynx-mode-line--vc-update-segment)
+(advice-add 'vc-refresh-state :after #'alynx-mode-line--vc-update-segment)
+#+end_src
+
+*为什么好*：modeline 的 =:eval= 每次重绘（滚动、移动光标）都会执行。如果在
+=:eval= 里现算 VC 分支名、数 flycheck 报错，就是每帧都算一遍——手写 modeline
+最常见的性能陷阱。正确做法是 *把重算绑到「状态真正改变」的事件上*
+（存盘、切文件、VC 刷新），=:eval= 只返回缓存字符串。
+
+** 两个小技巧
+
+#+begin_src emacs-lisp
+;; ① 选中/非选中窗口的区分，用一句 propertize 搞定，
+;;    而不去碰 format-mode-line 那个晦涩的第三个 face 参数。
+(defun alynx-mode-line--propertize (formatted-mode-line)
+  (if (mode-line-window-selected-p) formatted-mode-line
+    (propertize formatted-mode-line 'face 'mode-line-inactive)))
+
+;; ② 左右分栏用像素级 :align-to 对齐——注意 format-mode-line 会给 %b 强行
+;;    贴上 face，所以先 substring-no-properties 抹掉再自己贴。
+(propertize (substring-no-properties (format-mode-line "%b"))
+            'face 'alynx-mode-line-face-buffer-name)
+#+end_src
+
+*你的配置*：结论就一句——doom-modeline 已经替你把「缓存 + 只在事件时更新」做好
+了，所以你不用手写。这一节的价值是让你 *知道它为什么快*，将来若要自定义某个
+modeline 段，记得别在 =:eval= 里现算重活。
+
+* 6. =.local/= 重定向：让同步的仓库保持干净
+
+他把 *所有* 会写状态的包，产出的文件都塞进一个 =.local/= 目录：
+
+#+begin_src emacs-lisp
+(make-directory (locate-user-emacs-file ".local/") t)
+(make-directory (locate-user-emacs-file ".local/cache/") t)   ; 可安全删除的缓存
+(make-directory (locate-user-emacs-file ".local/backup/") t)  ; 备份/自动保存
+;; 之后 recentf、saveplace、savehist、undo、tramp、eshell、projects、
+;; package-quickstart…… 全部 (locate-user-emacs-file ".local/xxx") 重定向进去。
+#+end_src
+
+*为什么好*：他的配置是要跨机器 git 同步的，仓库根目录必须干净。把几十个运行时
+文件收进一个 =.local/=（且 gitignore 掉），根目录只剩真正的源码。=.gitignore=
+也从几十行缩成一行。
+
+*你的配置*：你的 =.gitignore= 其实已经很全，那些运行时文件 *没有* 被 git 跟踪——
+git 层面你是干净的。差别只在 *物理层面*：你的仓库根目录散着 =auto-save/=、
+=backups/=、=org/=、=transient/=、=nov-places=、=projects= 等十几个目录/文件。
+纯属整洁问题，不影响正确性。想更清爽就学他，用
+=(locate-user-emacs-file "var/...")= 把它们归到一处。
+
+⚠️ 顺带一个 *真问题*：你 =.gitignore= 里忽略了整个 =/site-lisp/=，也就是你
+vendored 的 =eldoc-box= 不会被跟踪——全新 clone 后它会静默消失（childframe 文档
+就没了）。他对 vendored 依赖用的是 git submodule（=lsp-bridge=），会被
+=.gitmodules= 记录。你可以把 =eldoc-box= 也改成 submodule，或干脆别 ignore
+=site-lisp/=。
+
+* 7. key-translation-map：翻译「按键事件」而非重绑函数
+
+他想把 =C-h= 当退格用（=init.el:533=，前面还有 35 行终端历史考据）。做法很讲究：
+
+#+begin_src emacs-lisp
+;; 不好的做法：把 C-h 绑到 backward-delete-char 之类的函数——因为很多「向后
+;; 删除」相关命令其实是绑在 DEL 这个键码上的，一个个重绑会漏。
+;; 正确做法：让 C-h 直接生成 DEL 键码（就像 C-i 生成 TAB），M-h 同理生成 M-DEL。
+(global-unset-key (kbd "C-h"))
+(define-key key-translation-map (kbd "C-h") (kbd "DEL"))
+(define-key key-translation-map (kbd "M-h") (kbd "M-DEL"))
+;; C-h 让位后，用 <f1> 作为帮助前缀（Emacs 本来就有这个备用前缀）。
+#+end_src
+
+*为什么好*：在 =key-translation-map= 层「翻译按键」，等于在最底层把 =C-h= 变成
+=DEL= 事件，于是 *所有* 绑在 =DEL= 上的命令都自动生效，无需逐个重绑。选对了抽象
+层次。（他还特意用 =key-translation-map= 而非 =keyboard-translate=，因为后者只
+接受单个字符，而 =M-DEL= 是一个序列。）
+
+*你的配置*：这招是否要抄，取决于你想不想把 =C-h= 当退格。思路本身通用——凡是
+「想让某键表现得和另一个键一模一样」，翻译按键比重绑函数更干净、更不易漏。
+
+* 8. 值得偷师的小命令
+
+一批零依赖、纯手写的顺手命令（=init.el:572-694=）：
+
+#+begin_src emacs-lisp
+;; 把下一行并到当前行（默认 join-line 是并到上一行）。
+(defun join-next-line () (interactive) (join-line 1))
+(global-set-key (kbd "C-j") 'join-next-line)
+
+;; 智能行首：C-a 在「首个非空白字符」和「真正的行首」之间来回切。
+(defun smarter-move-beginning-of-line (arg)
+  (interactive "^p")
+  (let ((orig-point (point)))
+    (back-to-indentation)
+    (when (= orig-point (point)) (move-beginning-of-line 1))))
+(global-set-key [remap move-beginning-of-line] 'smarter-move-beginning-of-line)
+
+;; Atom 风格：在下方/上方插入并缩进好的新行（不必先跳到行尾/行首）。
+(defun open-next-line () (interactive)
+  (end-of-line) (reindent-then-newline-and-indent))
+(global-set-key (kbd "C-o") 'open-next-line)
+
+;; C↔H 跳转：打开兄弟文件但显示在另一个窗口。
+(global-set-key (kbd "C-c M-f") 'find-sibling-file-other-window)
+
+;; 一键打开自己的 init.el。
+(defun edit-config () (interactive)
+  (find-file (locate-user-emacs-file "init.el")))
+(global-set-key (kbd "C-,") 'edit-config)
+#+end_src
+
+*为什么好*：全是「用了就回不去」的小改进，零第三方依赖，每个都短到能一眼看懂。
+
+*你的配置*：直接可抄的：
+- =smarter-move-beginning-of-line=（=C-a= 切换缩进/行首）——几乎人人都会天天用；
+- =find-sibling-file-other-window=（C↔H）——你写 C/C++，正对口。Emacs 29+ 已内置
+  =find-sibling-file=，配好 =find-sibling-rules= 即可，甚至不用抄他的 noselect 版；
+- =open-next-line= / =join-next-line=——看你顺不顺手。
+
+你已有 =open-init-file=（f2），和他的 =edit-config= 是同一个东西。
+
+* 9. use-package 的 :defer 纪律
+
+他把「什么时候加载一个包」写成了成文规则（=init.el:776=），而不是凭感觉：
+
+#+begin_src emacs-lisp
+;; NOTE：若一个包同时有 :bind/:mode/:commands 又想在 :config 里开全局 mode，
+;;       全局 mode 永远不会生效——因为那些关键字会让 use-package 惰性加载它。
+;;       想打破惰性加载，加 :demand t。
+;;
+;; (use-package PKG) 默认在启动时加载；若只想设几个变量而不加载（比如改
+;; tramp 的缓存路径但不想启动就加载 tramp），用 :defer t——:custom 仍会生效。
+;;
+;; 若一个包启动时不需要、又没有能触发惰性加载的关键字、但之后要用，
+;; 加 :defer 1 让它在 1 秒后加载。
+;;
+;; :defer t 与 :defer 1 的区别：:defer 1 会在 1 秒后加载；:defer t 根本不加载，
+;; 等别的代码来触发。
+#+end_src
+
+另外他倾向 *用书写顺序而非 =:after= 来排依赖*：把块按「依赖的 =:custom= 先跑」
+的顺序摆好，并注释了理由（=:after= 要求先触发依赖的所有键绑定，其 =:config=
+才会跑）。
+
+*为什么好*：=use-package= 的惰性加载是「配置为什么没生效 / 启动为什么慢」的头号
+迷惑来源。把 =:defer t= / =:defer 1= / =:demand t= 的语义写清楚、并一致执行，等于
+把玄学变成规则。
+
+*你的配置*：你的 =vterm= 块正好踩了一个相关的坑——
+
+#+begin_src emacs-lisp
+;; 你现在的写法（无效！）：
+:custom
+(setq vterm-kill-buffer-on-exit t)   ; :custom 期望 (变量 值)，不是 (setq …)
+(setq vterm-shell "/bin/zsh")        ; 这几行实际什么都没设成
+(pixel-scroll-precision-mode 1)      ; 这个 mode 也没真的开
+
+;; 应改成：
+:custom
+(vterm-kill-buffer-on-exit t)
+(vterm-shell "/bin/zsh")
+:config
+(pixel-scroll-precision-mode 1)
+#+end_src
+
+=:custom= 只接受 =(变量 值)= 形式；=setq= 表达式和函数调用要放 =:config=。
+
+* 10. 注释哲学：unused.el 与「保留被否决的方案」
+
+最该学的其实不是某段代码，而是他的 *写注释的习惯*：
+
+- *几乎每个决定都写清 WHY*，且常引用上游 commit 号、bug 编号、邮件列表链接。
+- *保留被否决的方案*：他专门有个 =unused.el=，存放「已弃用但注释有价值」的配置。
+  比如为什么从 lsp-mode 换到 lsp-bridge，他留了一段（措辞火爆的）吐槽 + 4 个
+  备选方案 + 链接。这样未来的自己不会把已经想明白的事重新纠结一遍。
+
+*你的配置*：你的注释密度其实已经很高，而且是 *中文 WHY*（他是全英文），比如：
+
+#+begin_src emacs-lisp
+;; 不把所有 JSON-RPC 事件记进 buffer，长时间多文件使用时会累积拖慢主线程。
+;; LSP server 关掉对应 buffer 后自动退出，避免后台残留进程占资源。
+#+end_src
+
+这点你和他是一个水准。可以补的一个习惯：像他的 =unused.el= 那样，*别直接删掉
+「试过但放弃」的配置*，而是连同「为什么放弃」一起挪到一个角落——你现在
+init.el 里注释掉的旧字体块、=rust-format-on-save= 等，与其散在原地，不如集中，
+将来回顾更清楚。
+
+* 附：可直接落地到你配置的清单
+
+按「性价比」排序，都是这次精读顺带发现、值得动手的：
+
+** 立刻做（便宜且高收益）
+1. 补 =savehist-mode= / =save-place-mode= / =recentf-mode=（内置，共约 6 行）。
+   Vertico 官方就推荐 savehist——能让最近/高频候选排到前面。你现在三个都没开。
+2. 修 =vterm= 的 =:custom= bug（见第 9 节），否则 shell、kill-on-exit、平滑滚动
+   其实都没生效。
+3. 别跑 =M-x package-autoremove=，直到把 =package-selected-packages= 填好
+   （现在是 nil，会全删）。
+
+** 值得加（小而顺手）
+4. =smarter-move-beginning-of-line=（C-a 切换）、内置 =find-sibling-file=
+   （C↔H，你写 C/C++ 正好用得上）——见第 8 节。
+5. =diff-hl=：编辑时在 fringe 显示改动行，和你的 magit 互补。
+6. =popper=（弹窗管理）、=hl-todo=（高亮 TODO/FIXME）、=vundo= 或 =undo-tree=
+   （撤销可视化）、=editorconfig=（跟随项目缩进）。
+
+** 认真考虑（较大）
+7. =dape=：你在迁到 eglot 时把调试器弄丢了（dap-mode 成了孤儿、codelldb 适配器
+   闲置在 =.extension/= 里）。dape 是 eglot 时代对应的 DAP 客户端，无需 lsp-mode。
+   对做 Rust/C++ 的你，这是当前 *缺失的最重要能力*。
+8. 把 =rust-mode= 重映射到 =rust-ts-mode=（你现在 =.rs= 用的是非 tree-sitter 的
+   老 =rust-mode=，但 eglot 却挂在 =rust-ts-mode= 上，两边没对齐）。
+9. =package-quickstart= + 显式 =package-activate-all=（第 2 节）——启动再快一点。
+10. 清掉迁移残留的孤儿包：=lsp-mode= / =lsp-treemacs= / =lsp-docker= /
+    =dap-mode= / =treemacs= / =eat=（先做上面第 3 条，再卸载）。
+
+** 环境层面（非配置能改）
+- 你的 Emacs 30.2 是 =native-comp: nil= 的构建。原生编译是最大的一档性能提升，
+  但要重新用带 libgccjit 的方式编译 Emacs，属于基础设施决定，不是改配置能解决。

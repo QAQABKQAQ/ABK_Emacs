@@ -17,8 +17,7 @@
 (push '(vertical-scroll-bars) default-frame-alist)
 (setq inhibit-startup-message t)
 
-;; 进程输出最大值
-(setq read-process-output-max (* 1024 1024)) ; 1MB
+;; read-process-output-max 统一在 init.el 末尾设置(带完整注释),此处不再重复
 
 
 

@@ -12,7 +12,22 @@
 
 ;; =====ENV=====
 
+;; 禁用系统警告音（macOS上会从内置扬声器发出）
+(setq ring-bell-function 'ignore)  ; 完全禁用bell
+(setq visible-bell nil)            ; 也禁用可视化bell
 
+;; 把 Emacs 生成的备份/自动保存文件集中放在配置目录里，避免污染项目目录。
+(let ((backup-dir (expand-file-name "backups/" user-emacs-directory))
+      (auto-save-dir (expand-file-name "auto-save/" user-emacs-directory)))
+  (make-directory backup-dir t)
+  (make-directory auto-save-dir t)
+  (setq backup-directory-alist `(("." . ,backup-dir))
+        auto-save-file-name-transforms `((".*" ,auto-save-dir t))
+        backup-by-copying t
+        version-control t
+        delete-old-versions t
+        kept-new-versions 6
+        kept-old-versions 2))
 
 
 
@@ -21,6 +36,35 @@
 
 (when (file-exists-p custom-file)
   (load custom-file))
+
+;; ==== 会话持久化 (借鉴 alynx / Vertico 官方推荐) ====
+;; 把这些运行时文件集中到 var/,保持配置根目录干净(alynx 的 .local/ 思路)。
+;; var/ 已在 .gitignore 中忽略,不会污染仓库。
+(defconst my/var-dir (expand-file-name "var/" user-emacs-directory)
+  "集中存放运行时状态文件的目录。")
+(make-directory my/var-dir t)
+
+;; savehist: 记住 minibuffer 历史,让最近/高频候选在 Vertico 里排到前面。
+(use-package savehist
+  :ensure nil
+  :init
+  (setq savehist-file (expand-file-name "history" my/var-dir))
+  (savehist-mode 1))
+
+;; saveplace: 重开文件时把光标恢复到上次离开的位置。
+(use-package saveplace
+  :ensure nil
+  :init
+  (setq save-place-file (expand-file-name "places" my/var-dir))
+  (save-place-mode 1))
+
+;; recentf: 维护最近打开文件列表,喂给 consult-buffer 的「最近文件」区。
+(use-package recentf
+  :ensure nil
+  :init
+  (setq recentf-save-file (expand-file-name "recentf" my/var-dir)
+        recentf-max-saved-items 200)
+  (recentf-mode 1))
 
 
 (use-package which-key
@@ -60,7 +104,14 @@
     "C-c h" "查看当前函数文档"
     "C-c f" "手动格式化当前buffer"
     "C-c d" "切换悬浮函数文档"
-    "C-c m" "打开邮箱"))
+    "C-c m" "打开邮箱"
+    "C-x SPC" "矩形选择(rectangle-mark-mode)"
+    "C-x r" '("矩形/寄存器" . "矩形编辑和寄存器命令")
+    "C-x r t" "矩形区域每行插入/替换字符串"
+    "C-x r k" "删除矩形区域"
+    "C-x r y" "粘贴上次删除的矩形"
+    "C-x r N" "给矩形区域的每一行编号"
+    "C-c M-f" "跳转到头文件/源文件(C/C++)"))
 
 (use-package exec-path-from-shell
   :ensure t
@@ -143,7 +194,8 @@
   (setq treesit-language-source-alist
         '((javascript "https://github.com/tree-sitter/tree-sitter-javascript")
           (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
-          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
+          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")
+          (rust "https://github.com/tree-sitter/tree-sitter-rust")))
   :config
   (let ((grammar-dir (expand-file-name "tree-sitter" user-emacs-directory)))
     (unless (file-directory-p grammar-dir)
@@ -156,10 +208,16 @@
           (typescript-mode . typescript-ts-mode)
           (tsx-mode . tsx-ts-mode)))
 
-  (defun my/treesit-install-web-grammars ()
-    "Install missing tree-sitter grammars for JS, TS and TSX."
+  ;; Rust 走 tree-sitter,但仅当 rust 语法已安装时才重映射;
+  ;; 否则回退到经典 rust-mode,避免语法缺失时打开 .rs 直接报错。
+  ;; 安装语法后重启即可自动升级: M-x my/treesit-install-grammars
+  (when (treesit-language-available-p 'rust)
+    (add-to-list 'major-mode-remap-alist '(rust-mode . rust-ts-mode)))
+
+  (defun my/treesit-install-grammars ()
+    "Install missing tree-sitter grammars for JS, TS, TSX and Rust."
     (interactive)
-    (dolist (lang '(javascript typescript tsx))
+    (dolist (lang '(javascript typescript tsx rust))
       (unless (treesit-language-available-p lang)
         (treesit-install-language-grammar lang)))))
 
@@ -249,13 +307,15 @@
 (defun my/format-buffer ()
   "Format current buffer on demand.
 
-Use LSP formatting in Eglot-managed buffers; otherwise reindent the whole
-buffer with the current major mode's indentation rules."
+Prefer lsp-bridge formatting, then Eglot, else reindent the whole buffer with
+the current major mode's indentation rules."
   (interactive)
-  (if (and (fboundp 'eglot-managed-p)
-           (eglot-managed-p))
-      (eglot-format-buffer)
-    (indent-region (point-min) (point-max))))
+  (cond
+   ((bound-and-true-p lsp-bridge-mode)
+    (lsp-bridge-code-format))
+   ((and (fboundp 'eglot-managed-p) (eglot-managed-p))
+    (eglot-format-buffer))
+   (t (indent-region (point-min) (point-max)))))
 
 (global-set-key (kbd "C-c f") #'my/format-buffer)
 
@@ -304,51 +364,79 @@ explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
 ;;  (setq rust-format-on-save t)) ; 自动格式化
 
 
-;; ==== emacs 内置
-(use-package eglot
-  :ensure nil
-  :hook ((rust-ts-mode . eglot-ensure)
-         (rust-mode . eglot-ensure)
-         (c-mode . eglot-ensure)
-         (c++-mode . eglot-ensure)
-         (go-mode . eglot-ensure)
-         (java-mode . eglot-ensure)
-         (js-ts-mode . eglot-ensure)
-         (js-mode . eglot-ensure)
-         (typescript-ts-mode . eglot-ensure)
-         (tsx-ts-mode . eglot-ensure))
-  :bind(:map eglot-mode-map
-             ("M-." . xref-find-definitions)
-             ("M-," . xref-pop-marker-stack)
-             ("M-?" . xref-find-references)
-             ("C-c r" . eglot-rename)
-             ("C-c h" . eldoc-doc-buffer)
-             ("C-c f" . my/format-buffer))
-  :config
-  (add-hook 'before-save-hook #'my/eglot-format-on-save)
-  (setq eldoc-echo-area-use-multiline-p t)
-  (setq eldoc-idle-delay 0.2)
-  (add-hook 'eglot-managed-mode-hook #'eldoc-mode))
+;; ==== LSP: lsp-bridge (独立进程异步客户端,借鉴 alynx) ====
+;; 从 eglot 迁移到 lsp-bridge:LSP 跑在独立 Python 进程里,永不阻塞主线程;
+;; 补全用它自带的 acm(输入时自动弹出,不再是 corfu 的手动 C-return)。
+;; 旧的 eglot / eldoc-box 配置已移除,需要回滚见 git 历史或 doc/alynx-精读.org。
+;;
+;; 依赖(均已 gitignore,换机器需按下面命令重建):
+;;   - 代码:    site-lisp/lsp-bridge/        (git clone)
+;;   - Python:  var/lsp-bridge-venv/         (Python 3.13 venv)
+;;   - 语言服务器: rust-analyzer / clangd / jdtls / pyright /
+;;               typescript-language-server (需在 PATH,lsp-bridge 自动探测)
+;; 重建 Python 环境:
+;;   git clone --depth 1 https://github.com/manateelazycat/lsp-bridge.git \
+;;     ~/.config/emacs/site-lisp/lsp-bridge
+;;   python3.13 -m venv ~/.config/emacs/var/lsp-bridge-venv
+;;   ~/.config/emacs/var/lsp-bridge-venv/bin/pip install \
+;;     epc orjson sexpdata six watchdog rapidfuzz
 
-(let ((eldoc-box-dir (expand-file-name "site-lisp/eldoc-box" user-emacs-directory)))
-  (when (file-directory-p eldoc-box-dir)
-    (add-to-list 'load-path eldoc-box-dir)))
+;; yasnippet: lsp-bridge 用它展开补全里的代码片段(是 lsp-bridge 的依赖)。
+(use-package yasnippet
+  :ensure t
+  :hook (prog-mode . yas-minor-mode))
 
-(use-package eldoc-box
-  :if (locate-library "eldoc-box")
-  :ensure nil
-  :after eglot
-  :bind (:map eglot-mode-map
-              ("C-c d" . my/eldoc-box-toggle-help-at-point))
+(use-package yasnippet-snippets
+  :ensure t
+  :after yasnippet)
+
+(use-package lsp-bridge
+  :ensure nil                          ; 不在 MELPA,作为本地代码从 site-lisp/ 加载
+  :load-path "site-lisp/lsp-bridge/"
+  :hook ((rust-mode . lsp-bridge-mode)
+         (rust-ts-mode . lsp-bridge-mode)
+         (c-mode . lsp-bridge-mode)
+         (c++-mode . lsp-bridge-mode)
+         (java-mode . lsp-bridge-mode)
+         (python-mode . lsp-bridge-mode)
+         (python-ts-mode . lsp-bridge-mode)
+         (js-mode . lsp-bridge-mode)
+         (js-ts-mode . lsp-bridge-mode)
+         (typescript-ts-mode . lsp-bridge-mode)
+         (tsx-ts-mode . lsp-bridge-mode))
+  :init
+  ;; 后端用的 Python:优先隔离的 venv,缺失则回退系统 python3
+  ;;(换机器时 var/ 不同步,回退保证至少不报错)。
+  (setq lsp-bridge-python-command
+        (let ((venv (expand-file-name "var/lsp-bridge-venv/bin/python"
+                                      user-emacs-directory)))
+          (if (file-exists-p venv) venv "python3")))
   :custom
-  (eldoc-box-only-multi-line nil)
+  ;; 悬停时显示诊断(错误/警告)。
+  (lsp-bridge-enable-hover-diagnostic t)
+  ;; 函数签名用子帧显示在光标处,不占用 echo area。
+  (lsp-bridge-signature-show-function 'lsp-bridge-signature-show-with-frame)
+  (lsp-bridge-signature-show-with-frame-position 'point)
+  ;; 补全弹窗里不塞文档(太吵),文档用 C-c h / C-c d 手动看。
+  (acm-enable-doc nil)
+  (acm-enable-tabnine nil)
+  :bind (:map lsp-bridge-mode-map
+              ;; 沿用你原来的键位,命令换成 lsp-bridge 等价物。
+              ("M-." . lsp-bridge-find-def)               ; 跳转定义
+              ("M-," . lsp-bridge-find-def-return)        ; 跳回
+              ("M-?" . lsp-bridge-find-references)        ; 查找引用
+              ("C-c r" . lsp-bridge-rename)               ; 重命名符号
+              ("C-c h" . lsp-bridge-popup-documentation)  ; 查看文档
+              ("C-c d" . lsp-bridge-popup-documentation)  ; 同上(保留旧习惯)
+              ("C-c f" . my/format-buffer)                ; 格式化
+              ("M-n" . lsp-bridge-diagnostic-jump-next)   ; 下一个诊断
+              ("M-p" . lsp-bridge-diagnostic-jump-prev)   ; 上一个诊断
+              ("C-c ! l" . lsp-bridge-diagnostic-list))   ; 诊断列表
   :config
-  (defun my/eldoc-box-toggle-help-at-point ()
-    "Toggle the Eldoc childframe for the symbol at point."
-    (interactive)
-    (if (eldoc-box--frame-visible-p)
-        (eldoc-box-quit-frame)
-      (eldoc-box-help-at-point))))
+  ;; lsp-bridge 缓冲用 acm 补全,顺手关掉 corfu,免得 C-return 弹出空补全。
+  (add-hook 'lsp-bridge-mode-hook
+            (lambda ()
+              (when (bound-and-true-p corfu-mode) (corfu-mode -1)))))
 
 
 
@@ -372,12 +460,9 @@ explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
           (:propertize flymake-mode-line-warning-counter
                        face flymake-warning-echo-at-point)
           "]"))
-  ;; 缩短 ElDoc (显示文档/报错) 的响应时间
-  (setq eldoc-idle-delay 0.1)
-  ;; 让报错信息显示得更完整，但不要让它自动撑开回显区高度
-  ;;(setq eldoc-echo-area-use-multiline-p nil)
-  ;; 错误指示灯放在左侧边缘
-  (setq flymake-fringe-indicator-position 'left-fringe)
+        (setq flymake-fringe-indicator-position 'left-fringe)
+        ;; 末尾显示错位
+        ;; (setq flymake-show-diagnostics-at-end-of-line 'short)
   ;; 没有错误时不显示 0
   (setq flymake-suppress-zero-counters t))
 
@@ -398,8 +483,11 @@ explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
 (use-package vterm
   :ensure t
   :custom
-  (setq vterm-kill-buffer-on-exit t)
-  (setq vterm-shell "/bin/zsh")
+  ;; :custom 只接受 (变量 值),不能写 setq——之前那样写等于没生效。
+  (vterm-kill-buffer-on-exit t)
+  (vterm-shell "/bin/zsh")
+  :config
+  ;; 平滑滚动是全局行为(不是 vterm 变量),放 :config 里真正开启。
   (pixel-scroll-precision-mode 1))
 
 
@@ -410,7 +498,20 @@ explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
   :config
   (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
 
-;; ==== mail ====
+;; 编辑时在 fringe 实时显示 VCS 改动行。和 magit 互补:
+;; magit 管暂存/提交,diff-hl 管「此刻这个文件改了哪几行」的即时可视。
+(use-package diff-hl
+  :ensure t
+  :hook ((prog-mode . diff-hl-mode)
+         ;; magit 操作前后刷新,避免 diff-hl 标记与实际状态脱节。
+         (magit-pre-refresh . diff-hl-magit-pre-refresh)
+         (magit-post-refresh . diff-hl-magit-post-refresh)))
+
+;; 高亮 TODO / FIXME / HACK / NOTE 等关键字,一眼看到代码里的待办。
+(use-package hl-todo
+  :ensure t
+  :hook (prog-mode . hl-todo-mode))
+
 ;; ==== mail ====
 (use-package mu4e
   :ensure nil
@@ -550,6 +651,32 @@ explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
      ((file-exists-p "Makefile")   (compile "make -k"))
      (t (call-interactively 'compile)))))
 
+;; 智能行首:C-a 在「首个非空白字符」和「真正的行首」之间切换(借鉴 alynx)。
+(defun my/smarter-move-beginning-of-line (arg)
+  "Move to the first non-whitespace char, or to BOL if already there.
+With ARG, move forward ARG-1 lines first."
+  (interactive "^p")
+  (setq arg (or arg 1))
+  (when (/= arg 1)
+    (let ((line-move-visual nil))
+      (forward-line (1- arg))))
+  (let ((orig-point (point)))
+    (back-to-indentation)
+    (when (= orig-point (point))
+      (move-beginning-of-line 1))))
+
+(global-set-key [remap move-beginning-of-line]
+                #'my/smarter-move-beginning-of-line)
+
+;; C/C++ 头文件↔源文件互跳(内置 find-sibling-file, Emacs 29+)。
+;; 只打开已存在的兄弟文件;.h 会同时匹配 .c/.cpp/.cc。
+(setq find-sibling-rules
+      '(("\\([^/]+\\)\\.c\\'" "\\1.h")
+        ("\\([^/]+\\)\\.h\\'" "\\1.c" "\\1.cpp" "\\1.cc")
+        ("\\([^/]+\\)\\.cpp\\'" "\\1.h" "\\1.hpp")
+        ("\\([^/]+\\)\\.hpp\\'" "\\1.cpp")))
+(global-set-key (kbd "C-c M-f") #'find-sibling-file)
+
 
 
 
@@ -564,8 +691,13 @@ explicitly opted in. Use `C-c f' in an Eglot buffer to format manually.")
 (load-theme 'modus-vivendi t)
 
 ;; 放在最后一行
-;; 降低gc 防止占用过高
+;; LSP/eglot 性能：单次从子进程读取的最大字节数。默认仅 4KB，
+;; LSP server 一次会推送上百 KB 的 JSON，过小会让 Emacs 反复进出
+;; 读循环造成卡顿。调到 1MB 是 eglot 官方推荐做法。
+(setq read-process-output-max (* 1024 1024))
+;; 启动后把 GC 阈值恢复到一个对 LSP 友好的值。LSP 大量分配内存，
+;; 16MB 在重负载下 GC 过于频繁，提到 100MB 减少卡顿。
 (add-hook 'emacs-startup-hook
           (lambda ()
-            (setq gc-cons-threshold (* 16 1024 1024))))
+            (setq gc-cons-threshold (* 100 1024 1024))))
  
