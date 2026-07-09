@@ -1,496 +1,134 @@
-
-;;===================
-;; emacs init       |
-;; Author: Ephemera |
-;;===================
+;;; -*- lexical-binding: t; -*-
 
 
-
-
-(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-
-
-;; =====ENV=====
+;; 长度为4个字段
+(setq-default tab-width 8)
+;; `indent-tabs-mode` 不意味只使用制表符，如果缩进级别
+;; 可以被`tab-width`整除，则使用制表符，其余部分使用空格
+(setq-default indent-tabs-mode t)
 
 
 
 
 
-;; =============
-
-
-(when (file-exists-p custom-file)
-  (load custom-file))
-
-
-(use-package which-key
-  :ensure nil
-  :init
-  (which-key-mode)
-  :config
-  (which-key-add-key-based-replacements
-    ;; prefix labels: these show when you stop at C-c / M-g / C-x p
-    "C-c s" '("搜索" . "搜索相关命令")
-    "C-c !" '("诊断" . "诊断相关命令")
-    "C-c c" "快速记录任务(org-capture)"
-    "C-c a" "查看任务清单(org-agenda)"
-    "M-g" '("跳转" . "跳转相关命令")
-    "C-x p" '("项目" . "项目相关命令")
-    ;; leaf labels
-    "C-x s p" "项目全局搜索(consult-ripgrep)"
-    "C-x s b" "搜索当前项目的所有buffer(consult-project-buffer)"
-    "M-g g" "行跳转"
-    "M-g m" "跳转到标记点"
-    "M-g i" "跳转到当前文件的函数/定义"
-    "C-s" "替换原生搜索"
-    "M-o" "替换原生切换窗口M-o"
-    "C-x p f" "快速找项目内容文件"
-    "C-x p b" "只在项目buffer间切换"
-    "C-x p c" "项目根目录运行编辑"
-    "<C-return>" "补全"
-    "S-SPC" "模糊搜索"
-    "M-n" "下一个Error"
-    "M-p" "上一个Error"
-    "C-c ! l" "显示当前文件所有问题"
-    "M-." "跳转文档"
-    "M-," "返回"
-    "M-?" "查找引用"
-    "C-c r" "重命名符号"
-    "C-c h" "查看当前函数文档"
-    "C-c d" "悬浮查看函数文档"
-    "C-c m" "打开邮箱"))
-
-(use-package exec-path-from-shell
-  :ensure t
-  :config
-  (exec-path-from-shell-initialize)
-  (exec-path-from-shell-copy-envs
-   '("http_proxy" "https_proxy" "all_proxy" "HTTP_PROXY" "HTTPS_PROXY" "ALL_PROXY")))
-
-;; Git over SSH breaks in Emacs-launched shells unless we strip a few
-;; Emacs-specific env vars before delegating to the system ssh binary.
-(setenv "GIT_SSH_COMMAND"
-        (expand-file-name "~/.local/bin/git-ssh-clean-env"))
-
-
-
-
-(use-package vertico
-  :ensure t
+(use-package emacs
+  :hook
+  ;; 光标进不去 minibuffer 的提示文字
+  (minibuffer-setup . cursor-intangible-mode)
   :custom
-  (vertico-preselect 'directory)
-  :init
-  (vertico-mode))
-
-(use-package vertico-multiform
-  :ensure nil
-  :after vertico
-  :custom
-  (vertico-multiform-categories '((file (vertico-preselect . prompt))))
-  :init
-  (vertico-multiform-mode))
-
-(use-package orderless
-  :ensure t
-  :custom
-  (completion-styles '(orderless basic))
-  (completion-category-overrides '((file (styles basic partial-completion))))
-  (completion-pcm-leading-wildcard t)
-  (completion-category-defaults nil))
-
-
-;; 窗口切换
-(use-package ace-window
-  :ensure t
-  :bind ("M-o" . ace-window)) ; 替换原生的 M-o
-
-(use-package pdf-tools
-  :ensure t
-  :mode ("\\.pdf\\'" . pdf-view-mode)
+  ;; disable startup buffer
+  (inhibit-startup-screen t)
+  ;; 关闭铃声
+  (ring-bell-function 'ignore)
+  ;; 非窗口活动不画光标
+  (highlight-nonselected-windows nil)
+  ;; 边缘3行自动滚动
+  (scroll-margin 3)
+  ;; >100 行光标出屏逐行滚动
+  (scroll-conservatively 101)
+  ;; 翻页往返光标回原位
+  (scroll-preserve-screen-position t)
+  ;; 在 minibuffer 内还可以再开 minibuffer
+  (enable-recursive-minibuffers t)
+  (minibuffer-prompt-properties
+   '(read-only t cursor-intangible t face minibuffer-prompt))
+  (scroll-margin 3)
+  (scroll-conservatively 101)
+  (scroll-preserve-screen-position t)
+  (auto-window-vscroll nil)
+  ;;滚动性能优化
+  (fast-but-imprecise-scrolling t)
+  (redisplay-skip-fontification-on-input t)
+  (jit-lock-defer-time 0)
+  ;;子进程读取的自适应缓冲
+  (process-adaptive-read-buffering nil)
+  ;;断行基准
+  (fill-column 80)
+  ;; 输入期间跳过字体渲染
+  (fast-but-imprecise-scrolling t)
+  (redisplay-skip-fontification-on-input t)
+  (jit-lock-defer-time 0)
+  ;; 禁止生成 .# 锁文件
+  (create-lockfiles nil)
+  (ring-bell-function 'ignore)
+  (inhibit-startup-screen t)
+  (use-short-answers t)
   :config
-  (pdf-tools-install))
-
-(use-package nov
-  :ensure t
-  :mode ("\\.epub\\'" . nov-mode))
-
-
-(use-package marginalia
-  :ensure t
-  :init
-  (marginalia-mode))
-
-(use-package consult
-  :ensure t
-  :bind (;; 1. 项目全局搜索
-         ("C-c s p" . consult-ripgrep)
-         ;; 2. 搜索当前项目的所有 Buffer
-         ("C-c s b" . consult-project-buffer)
-         ;; 3. 跳转功能
-         ("M-g g" . consult-goto-line)     ; 带预览的行跳转
-         ("M-g m" . consult-mark)          ; 跳转到标记点
-         ("M-g i" . consult-imenu)         ; 跳转到当前文件的函数/类定义 (Java/C++ 必备)
-         ;; 4. 搜索增强
-         ("C-s" . consult-line))           ; 替换原生搜索，带实时预览
-  :config
-  (setq consult-preview-key 'any)) ; 实时预览
-
-(use-package treesit
-  :ensure nil
-  :init
-  (setq treesit-language-source-alist
-        '((typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
-          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
-  :config
-  (let ((grammar-dir (expand-file-name "tree-sitter" user-emacs-directory)))
-    (unless (file-directory-p grammar-dir)
-      (make-directory grammar-dir t))
-    (add-to-list 'treesit-extra-load-path grammar-dir))
-  (defun my/treesit-install-web-grammars ()
-    "Install missing tree-sitter grammars for TypeScript and TSX."
-    (interactive)
-    (dolist (lang '(typescript tsx))
-      (unless (treesit-language-available-p lang)
-        (treesit-install-language-grammar lang)))))
-
-(use-package org
-  :ensure nil
-  :bind (("C-c c" . org-capture)
-         ("C-c a" . org-agenda))
-  :init
-  (setq org-directory (expand-file-name "org" user-emacs-directory)
-        org-default-notes-file (expand-file-name "todo.org" org-directory)
-        org-agenda-files (list org-default-notes-file)
-        org-log-done 'time)
-  :config
-  ;; Enable `<s TAB` style easy templates in Org buffers.
-  (require 'org-tempo)
-  (unless (file-directory-p org-directory)
-    (make-directory org-directory t))
-  (unless (file-exists-p org-default-notes-file)
-    (with-temp-file org-default-notes-file
-      (insert "#+title: Todo\n\n")))
-  (setq org-capture-templates
-        '(("t" "Todo" entry (file org-default-notes-file)
-           "* TODO %?\n%U\n"))))
-
-(use-package appt
-  :ensure nil
-  :after org
-  :init
-  (setq appt-message-warning-time 15
-        appt-display-interval 5
-        appt-display-mode-line t
-        appt-display-format 'window
-        appt-audible nil)
-  :config
-  (defun my/org-appt-refresh ()
-    "Refresh appointment reminders from Org agenda files."
-    (interactive)
-    (org-agenda-to-appt t))
-  (my/org-appt-refresh)
-  (appt-activate 1)
-  (add-hook 'org-finalize-agenda-hook #'my/org-appt-refresh)
-  (add-hook 'org-capture-after-finalize-hook #'my/org-appt-refresh)
-  (add-hook 'after-save-hook
-            (lambda ()
-              (when (derived-mode-p 'org-mode)
-                (my/org-appt-refresh)))))
-
-(use-package project
-  :ensure nil ; 内置
-  :bind (("C-x p f" . project-find-file)    ; 快速找项目内的文件
-         ("C-x p b" . project-switch-to-buffer) ; 只在项目 Buffer 间切换
-         ("C-x p c" . project-compile)))   ; 在项目根目录运行编译
-
-(use-package corfu
-  :ensure t
-  :init
-  (global-corfu-mode)
-  :bind
-  (:map global-map
-        ("<C-return>" . completion-at-point)) 
-  (:map corfu-map
-        ("S-SPC" . corfu-insert-separator))
-  :custom
-    (corfu-on-exact-match nil)
-  :config
-  (setq 
-   corfu-auto nil
-   corfu-cycle t
-   corfu-popupinfo-delay 0.1
-   corfu-preview-current nil
-   )
-  (corfu-popupinfo-mode)
- )
-
-
-
-
-(use-package rust-mode
-  :ensure t
-  :mode "\\.rs\\'"
-  :init
+  (set-language-environment "UTF-8")
+  (setq default-input-method nil)
   )
-;;  (setq rust-format-on-save t)) ; 自动格式化
 
-
-;; ==== emacs 内置
-(use-package eglot
-  :ensure nil
-  :hook ((rust-ts-mode . eglot-ensure)
-         (rust-mode . eglot-ensure)
-         (go-mode . eglot-ensure)
-         (c++-mode . eglot-ensure)
-         (java-mode . eglot-ensure)
-         (typescript-ts-mode . eglot-ensure)
-         (tsx-ts-mode . eglot-ensure))
-  :bind(:map eglot-mode-map
-             ("M-." . xref-find-definitions)
-             ("M-," . xref-pop-marker-stack)
-             ("M-?" . xref-find-references)
-             ("C-c r" . eglot-rename)
-             ("C-c h" . eldoc-doc-buffer))
-  :config
-  ;; 自动格式化
-  (add-hook 'before-save-hook 
-            (lambda () 
-              (when (eglot-managed-p) 
-                (eglot-format-buffer))))
-  (setq eldoc-echo-area-use-multiline-p t)
-  (setq eldoc-idle-delay 0.2)
-  (add-hook 'eglot-managed-mode-hook #'eldoc-mode))
-
-(let ((eldoc-box-dir (expand-file-name "site-lisp/eldoc-box" user-emacs-directory)))
-  (when (file-directory-p eldoc-box-dir)
-    (add-to-list 'load-path eldoc-box-dir)))
-
-(use-package eldoc-box
-  :if (locate-library "eldoc-box")
-  :ensure nil
-  :after eglot
-  :bind (:map eglot-mode-map
-              ("C-c d" . eldoc-box-help-at-point))
-  :hook (eglot-managed-mode . eldoc-box-hover-mode)
-  :custom
-  (eldoc-box-only-multi-line nil))
-
-
-
-
-
-
-(use-package flymake
-  :ensure nil
-  :bind (:map flymake-mode-map
-              ("M-n" . flymake-goto-next-error)
-              ("M-p" . flymake-goto-prev-error)
-              ("C-c ! l" . flymake-show-buffer-diagnostics)) ; 列表显示当前文件所有问题
-  :config
-    (setq flymake-mode-line-format
-        '(" " flymake-mode-line-exception flymake-mode-line-counters))
-  (setq flymake-mode-line-counter-format
-        '("["
-          (:propertize flymake-mode-line-error-counter
-                       face flymake-error-echo-at-point)
-          ":"
-          (:propertize flymake-mode-line-warning-counter
-                       face flymake-warning-echo-at-point)
-          "]"))
-  ;; 缩短 ElDoc (显示文档/报错) 的响应时间
-  (setq eldoc-idle-delay 0.1)
-  ;; 让报错信息显示得更完整，但不要让它自动撑开回显区高度
-  ;;(setq eldoc-echo-area-use-multiline-p nil)
-  ;; 错误指示灯放在左侧边缘
-  (setq flymake-fringe-indicator-position 'left-fringe)
-  ;; 没有错误时不显示 0
-  (setq flymake-suppress-zero-counters t))
-
-
-;; modeline 美化
-(use-package doom-modeline
-  :ensure t
-  :init (doom-modeline-mode 1)
-  :custom
-  (doom-modeline-height 25)     ; 设置合适的高度
-  (doom-modeline-bar-width 3)   ; 左侧装饰条宽度
-  (doom-modeline-icon t)        ; 开启图标（需安装 nerd-icons）
-  (doom-modeline-major-mode-icon t)
-  (doom-modeline-buffer-file-name-style 'truncate-with-project)) ; 智能显示路径
-
-
-;; === vterm terminal ===
-(use-package vterm
-  :ensure t
-  :custom
-  (setq vterm-kill-buffer-on-exit t)
-  (setq vterm-shell "/bin/zsh")
-  (pixel-scroll-precision-mode 1))
-
-
-;; === Git ===
+;; magit 管理 git 
 (use-package magit
   :ensure t
   :bind (("C-x g" . magit-status))
   :config
   (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
 
-;; ==== mail ====
-;; ==== mail ====
-(use-package mu4e
-  :ensure nil
-  :load-path "/opt/homebrew/opt/mu/share/emacs/site-lisp/mu/mu4e"
-  :bind (("C-c m" . mu4e))
-  :init
-  (require 'seq)
-
-  (defconst my/mu4e-proton-domains
-    '("albamkin.top" "proton.me" "protonmail.com" "pm.me"))
-
-  (defun my/mu4e-message-text (msg field)
-    (when msg
-      (let ((value (mu4e-message-field msg field)))
-        (cond
-         ((stringp value) value)
-         (value (prin1-to-string value))
-         (t "")))))
-
-  (defun my/mu4e-compose-from ()
-    (when (and (derived-mode-p 'message-mode)
-               (fboundp 'message-field-value))
-      (or (ignore-errors (message-field-value "From")) "")))
-
-  (defun my/mu4e-proton-message-p (&optional msg)
-    (let ((text (downcase (mapconcat #'identity
-                                     (list (or (my/mu4e-compose-from) "")
-                                           (my/mu4e-message-text msg :maildir)
-                                           (my/mu4e-message-text msg :from)
-                                           (my/mu4e-message-text msg :to)
-                                           (my/mu4e-message-text msg :cc))
-                                     " "))))
-      (or (string-prefix-p "/albamkin-top/" (my/mu4e-message-text msg :maildir))
-          (seq-some (lambda (domain)
-                      (string-match-p (concat "@" (regexp-quote domain) "\\_>") text))
-                    my/mu4e-proton-domains))))
-
-  (defun my/mu4e-folder (kind &optional msg)
-    (let ((proton (my/mu4e-proton-message-p msg)))
-      (pcase kind
-        ('drafts (if proton "/albamkin-top/Drafts" "/gmail/[Gmail]/草稿"))
-        ('sent   (if proton "/albamkin-top/Sent" "/gmail/[Gmail]/已发邮件"))
-        ('trash  (if proton "/albamkin-top/Trash" "/gmail/[Gmail]/已删除邮件"))
-        ('refile (if proton "/albamkin-top/Archive" "/gmail/[Gmail]/所有邮件")))))
-
-  (defun my/mu4e-sent-messages-behavior ()
-    (if (my/mu4e-proton-message-p) 'delete 'sent))
-
-  (setq mu4e-maildir "~/Maildir"
-        mu4e-get-mail-command "mbsync gmail albamkin-top"
-        mu4e-update-interval nil
-        mu4e-change-filenames-when-moving t
-        mu4e-view-auto-mark-as-read nil
-        mu4e-view-show-images t
-        mu4e-view-show-addresses t
-        mu4e-headers-results-limit 200
-        mu4e-drafts-folder (lambda (msg) (my/mu4e-folder 'drafts msg))
-        mu4e-sent-folder (lambda (msg) (my/mu4e-folder 'sent msg))
-        mu4e-trash-folder (lambda (msg) (my/mu4e-folder 'trash msg))
-        mu4e-refile-folder (lambda (msg) (my/mu4e-folder 'refile msg))
-        mu4e-sent-messages-behavior #'my/mu4e-sent-messages-behavior
-        ;; 常用快捷入口
-        mu4e-maildir-shortcuts
-        '((:maildir "/gmail/INBOX" :name "Inbox" :key ?i)
-          (:maildir "/gmail/Later" :name "Later" :key ?l)
-          (:maildir "/gmail/[Gmail]/已发邮件" :name "Sent" :key ?s)
-          (:maildir "/gmail/[Gmail]/草稿" :name "Drafts" :key ?d)
-          (:maildir "/gmail/[Gmail]/已删除邮件" :name "Trash" :key ?t)
-          (:maildir "/gmail/[Gmail]/所有邮件" :name "Archive" :key ?a)
-          (:maildir "/albamkin-top/INBOX" :name "Top Inbox" :key ?I)
-          (:maildir "/albamkin-top/Sent" :name "Top Sent" :key ?S)
-          (:maildir "/albamkin-top/Drafts" :name "Top Drafts" :key ?D)
-          (:maildir "/albamkin-top/Trash" :name "Top Trash" :key ?T)
-          (:maildir "/albamkin-top/Archive" :name "Top Archive" :key ?A))
-        ;; 主界面搜索书签
-        mu4e-bookmarks
-        '((:name "Inbox" :query "maildir:/gmail/INBOX" :key ?i)
-          (:name "Top Inbox" :query "maildir:/albamkin-top/INBOX" :key ?I)
-          (:name "Unread" :query "flag:unread" :key ?u)
-          (:name "Archive" :query "maildir:/gmail/[Gmail]/所有邮件" :key ?a)
-          (:name "Top Archive" :query "maildir:/albamkin-top/Archive" :key ?A)
-          (:name "Sent" :query "(maildir:/gmail/[Gmail]/已发邮件 OR maildir:/albamkin-top/Sent)" :key ?s)
-          (:name "Top Sent" :query "maildir:/albamkin-top/Sent" :key ?S)))
+;; 最近文件，现实历史文件
+(use-package recentf
   :config
-  (setq mu4e-context-policy 'pick-first
-        mu4e-compose-context-policy 'ask-if-none
-        mu4e-contexts
-        (list
-         (make-mu4e-context
-          :name "gmail"
-          :match-func (lambda (msg)
-                        (and msg
-                             (string-prefix-p "/gmail/"
-                                              (my/mu4e-message-text msg :maildir))))
-          :vars '((user-mail-address . "albamkin@gmail.com")
-                  (user-full-name . "albamkin")))
-         (make-mu4e-context
-          :name "albamkin.top"
-          :match-func #'my/mu4e-proton-message-p
-          :vars '((user-mail-address . "albamkin@albamkin.top")
-                  (user-full-name . "albamkin"))))))
+  (recentf-mode 1)
+  :custom
+  (recentf-save-file (locate-user-emacs-file ".local/recentf")))
 
-(use-package smtpmail
-  :ensure nil
-  :after mu4e
+;; minibuffer 历史 + 剪贴板跨重启存活
+(use-package savehist
   :config
-  (setq user-full-name "albamkin"
-        user-mail-address "albamkin@gmail.com"
-        send-mail-function 'sendmail-send-it
-        message-send-mail-function 'sendmail-send-it
-        sendmail-program (or (executable-find "https-mail-relay-sendmail")
-                             (expand-file-name "~/.local/bin/https-mail-relay-sendmail"))
-        message-sendmail-extra-arguments '("--read-envelope-from" "-t")
-        message-sendmail-f-is-evil t
-        mail-specify-envelope-from t
-        mail-envelope-from 'header))
+  (add-to-list 'savehist-additional-variables 'kill-ring)
+  (savehist-mode 1)
+  :custom
+  (savehist-file (locate-user-emacs-file ".local/history")))
+
 (use-package server
-  :ensure nil
+  :defer t
+  :custom
+  (server-lognil))
+
+(use-package dired
+  :defer t
+  :custom
+  (dired-listing-switches "-alh --group-directories-first gls"))
+
+(use-package comp
+  :defer t
+  :custom
+  (native-comp-async-report-warnings-errors 'silent))
+
+
+(use-package ls-lisp
+  :defer t
+  :custom
+  (ls-lisp-dirs-first t))
+
+(use-package dired
+  :defer t
+  :custom
+  (dired-dwim-target t)
+  (dired-listing-switches "-alh --group-directories-first"))
+
+(use-package xt-mouse
   :config
-  (unless (server-running-p)
-    (server-start)))
+  (xterm-mouse-mode 1))
 
+(use-package menu-bar
+  :derfer t
+  :config
+  (menu-bar-mode -1))
 
-;; ==== defun ====
-(defun open-init-file()
-  (interactive)
-  (find-file "~/.config/emacs/init.el")
-  )
-
-(defun my/project-run ()
-  (interactive)
-  (let ((default-directory (project-root (project-current t))))
-    (cond
-     ((file-exists-p "Cargo.toml") (compile "cargo run"))
-     ((file-exists-p "go.mod")     (compile "go run ."))
-     ((file-exists-p "pom.xml")    (compile "mvn exec:java"))
-     ((file-exists-p "Makefile")   (compile "make -k"))
-     (t (call-interactively 'compile)))))
+(use-package tool-bar
+  :defer t
+  :config
+  (tool-bar-mode -1))
 
 
 
+(setq custom-file (locate-user-emacs-file "custom.el"))
+(when (file-exists-p custom-file)
+  (load custom-file))
 
 
-
-
-;; ==== key ====
-(global-set-key (kbd "<f2>") 'open-init-file)
-(global-set-key (kbd "<f5>") 'my/project-run)
-
-;; ==== theme ====
-(load-theme 'modus-vivendi t)
-
-;; 放在最后一行
-;; 降低gc 防止占用过高
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (setq gc-cons-threshold (* 16 1024 1024))))
- 
+;; 创建文件
+(make-directory (locate-user-emacs-file ".local/") t)
+(make-directory (locate-user-emacs-file ".local/cache") t)
+(make-directory (locate-user-emacs-file ".local/backup/") t)

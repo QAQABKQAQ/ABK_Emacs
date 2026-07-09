@@ -1,68 +1,43 @@
+;;; early-init.el -*- lexical-binding: t; -*-
+
+;; 初始内存优化，减少垃圾回收GC频率
+;; 通过降低垃圾回收频率来加快启动速度
+;; 默认为800KB
+;; 同时lsp-mode 也需要大量空间
+;; See <https://emacs-lsp.github.io/lsp-mode/page/performance/#increase-the-amount-of-data-which-emacs-reads-from-the-process>
+(setq gc-cons-threshold (* 128 1024 1024))
+
+;; 增加emacs从进程读取的数据量
+;; emacs默认为4k，但是对于language server来说太低了
+;; See <https://emacs-lsp.github.io/lsp-mode/page/performance/#increase-the-amount-of-data-which-emacs-reads-from-the-process>
+(setq read-process-output-max (* 3 1024 1024))
+
+(add-hook 'emacs-startup-hook (lambda()
+                                      (setq gc-cons-threshold(* 16 1024 1024))))
 
 
 
+;; 标题栏(title bar) 只显示buffer
+(setq frame-title-format "%b - GNU Emacs")
 
-(setq package-archives '(("gnu". "https://elpa.gnu.org/packages/")
-			 ("nongnu" . "https://elpa.nongnu.org/nongnu/")
-			 ("melpa-tuna"  . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-			 ("melpa" . "https://melpa.org/packages/")))
+;; 启动设置参数，最大化启动，去除菜单栏，工具栏，双向滚动条
+(modify-all-frames-parameters '((fullscreen . maximized)
+			       (menu-bar-lines . 0)
+			       (tool-bar-lines . 0)
+			       (internal-border-width . 0)
+			       ;; 子帧边框宽度
+			       (child-frame-border-width . nil)
+			       ;; 竖向滚动条
+			       (vertical-scroll-bars . nil)
+			       ;; 横向滚动条
+			       (horizontal-scroll-bars . nil)))
+(when (featurep 'ns)
+  (setq ns-use-proxy-icon nil)
+  (setq frame-title-format nil)
+  (modify-all-frames-parameters '((ns-transparent-titlebar . t))))
 
-
-;; gc 设置 256MB，init处需要调低
-(setq gc-cons-threshold (* 256 1024 1024))
-
-;; 启动页面不必要的组件
-(push '(menu-bar-lines . 0) default-frame-alist)
-(push '(tool-bar-lines . 0) default-frame-alist)
-(push '(vertical-scroll-bars) default-frame-alist)
-(setq inhibit-startup-message t)
-
-;; 进程输出最大值
-(setq read-process-output-max (* 1024 1024)) ; 1MB
-
-
-
-
-(setq use-short-answers t) ; yes改为y
-(setq scroll-setup 1
-      scroll-conservatively 10000) ; 平滑滚动
-
-(global-hl-line-mode 1) ;高亮当前行
-(delete-selection-mode 1) ; 选中内容后输入可直接替换
-(setq-default indent-tabs-mode nil) ; 使用空格缩进 
-(setq-default tab-width 4) ; 缩进宽度为 4
-
-(electric-pair-mode t) ;补全括号
-(show-paren-mode t) ; 高亮匹配内容
-(setq show-paren-delay 0) ; 高亮延迟0
-
-
-
-
-
-
-
-;;====font====
-
-;; 设置字体
-;; 英文字体:https://monaspace.githubnext.com/
-;; 中文字体:https://github.com/lxgw/LxgwWenKai
-(defun my/apply-font-config ()
-  (interactive)
-  (when (display-graphic-p)
-
-    (set-face-attribute 'default nil
-			:family "Monaspace Neon"
-			:height 140
-			:weight 'normal
-			)
-    (dolist (charset '(kana han symbol cjk-misc bopomofo))
-      (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono")))
-    (setq face-font-rescale-alist '(("LXGW WenKai Mono" . 1.25))))
-  )
-
-(if (daemonp)
-    (add-hook 'server-after-make-frame-hook #'my/apply-font-config)
-  (add-hook 'window-setup-hook #'my/apply-font-config))
-
-
+;; 在early stage不要调整窗口大小
+(setq frame-inhibit-implied-resize t)
+;; 以像素而非字符数为单位调整窗口大小(Wayland 不支持按照字符数调整)
+;; 这个设置就是为了能够确保初始化最大化的窗口能够填满整个屏幕的
+(setq frame-resize-pixelwise t)
