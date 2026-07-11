@@ -11,11 +11,7 @@
 
 
 ;; =====ENV=====
-
-;; 再次确保无启动欢迎页（与 early-init 双保险）
-(setq inhibit-startup-screen t
-      inhibit-startup-message t
-      initial-scratch-message nil)
+;; 欢迎页 / GC / 代理 在 early-init.el，这里不重复。
 
 ;; 禁用系统警告音(macOS上会从内置扬声器发出)
 (setq ring-bell-function 'ignore)  ; 完全禁用bell
@@ -36,17 +32,14 @@
 
 
 (require 'package)
-;; 代理在 early-init 里已写入 url-proxy-services；这里再确保一次
-(when (fboundp 'my/setup-url-proxy-from-env)
-  (my/setup-url-proxy-from-env))
 
-;; 清华镜像在部分代理/Emacs url.el 组合下会 403 Forbidden；
-;; 中科大 + 官方 melpa 实测可下。代理走 early-init 的 url-proxy-services。
+
+
+;; 代理查看 early-init.el
 (setq package-archives
       '(("gnu"    . "https://mirrors.ustc.edu.cn/elpa/gnu/")
         ("nongnu" . "https://mirrors.ustc.edu.cn/elpa/nongnu/")
         ("melpa"  . "https://mirrors.ustc.edu.cn/elpa/melpa/")))
-;; 注意拼写：priorities（写成 priorites 不会生效）
 (setq package-archive-priorities '(("melpa" . 10) ("gnu" . 5) ("nongnu" . 5)))
 
 (package-initialize)
@@ -59,8 +52,7 @@
 (when (file-exists-p custom-file)
   (load custom-file))
 
-;; ==== 会话持久化 (借鉴 alynx / Vertico 官方推荐) ====
-;; 把这些运行时文件集中到 var/,保持配置根目录干净(alynx 的 .local/ 思路)。
+;; ==== 会话持久化 ====
 ;; var/ 已在 .gitignore 中忽略,不会污染仓库。
 (defconst my/var-dir (expand-file-name "var/" user-emacs-directory)
   "集中存放运行时状态文件的目录。")
@@ -94,46 +86,47 @@
   :init
   (which-key-mode)
   :config
+  ;; 只标注实际 bind 过的键，避免键位超前/写错前缀
   (which-key-add-key-based-replacements
-    ;; prefix labels: these show when you stop at C-c / M-g / C-x p
     "C-c s" '("搜索" . "搜索相关命令")
     "C-c !" '("诊断" . "诊断相关命令")
+    "C-c l" '("LSP" . "lsp-mode 命令")
     "C-c c" "快速记录任务(org-capture)"
     "C-c a" "查看任务清单(org-agenda)"
     "M-g" '("跳转" . "跳转相关命令")
     "C-x p" '("项目" . "项目相关命令")
-    ;; leaf labels
-    "C-x s p" "项目全局搜索(consult-ripgrep)"
-    "M-;" "注释"
-    "C-x s b" "搜索当前项目的所有buffer(consult-project-buffer)"
+    "C-c s p" "项目全局搜索(consult-ripgrep)"
+    "C-c s b" "搜索当前项目 buffer(consult-project-buffer)"
     "M-g g" "行跳转"
     "M-g m" "跳转到标记点"
     "M-g i" "跳转到当前文件的函数/定义"
-    "C-s" "替换原生搜索"
-    "M-o" "替换原生切换窗口M-o"
-    "C-x p f" "快速找项目内容文件"
-    "C-x p b" "只在项目buffer间切换"
-    "C-x p c" "项目根目录运行编辑"
-    "<C-return>" "补全"
-    "S-SPC" "模糊搜索"
-    "M-n" "下一个Error"
-    "M-p" "上一个Error"
-    "C-c ! l" "显示当前文件所有问题"
-    "M-." "跳转文档"
-    "M-," "返回"
+    "C-s" "行内搜索(consult-line)"
+    "M-o" "切换窗口(ace-window)"
+    "C-x p f" "项目内找文件"
+    "C-x p b" "项目 buffer 切换"
+    "C-x p c" "项目根目录编译"
+    "C-<return>" "触发补全"
+    "S-SPC" "orderless 分隔符"
+    "M-n" "下一个诊断(flycheck)"
+    "M-p" "上一个诊断(flycheck)"
+    "C-c ! l" "诊断列表"
+    "M-." "跳转到定义(xref)"
+    "M-," "返回上一跳转"
     "M-?" "查找引用"
-    "C-c r" "重命名符号"
-    "C-c h" "查看当前函数文档"
-    "C-c f" "手动格式化当前buffer"
-    "C-c d" "切换悬浮函数文档"
-    "C-c m" "打开邮箱"
-    "C-x SPC" "矩形选择(rectangle-mark-mode)"
-    "C-x r" '("矩形/寄存器" . "矩形编辑和寄存器命令")
-    "C-x r t" "矩形区域每行插入/替换字符串"
-    "C-x r k" "删除矩形区域"
-    "C-x r y" "粘贴上次删除的矩形"
-    "C-x r N" "给矩形区域的每一行编号"
-    "C-c M-f" "跳转到头文件/源文件(C/C++)"))
+    "C-c r" "重命名符号(lsp)"
+    "C-c h" "查看符号文档(lsp)"
+    "C-c f" "格式化 buffer"
+    "C-c d" "悬浮文档(lsp-ui)"
+    "C-x g" "Magit status"
+    "C-x SPC" "矩形选择"
+    "C-x r" '("矩形/寄存器" . "矩形编辑和寄存器")
+    "C-x r t" "矩形每行插入字符串"
+    "C-x r k" "删除矩形"
+    "C-x r y" "粘贴矩形"
+    "C-x r N" "矩形行编号"
+    "C-c M-f" "头文件/源文件互跳"
+    "<f2>" "打开 init.el"
+    "<f5>" "项目运行(my/project-run)"))
 
 (use-package exec-path-from-shell
   :ensure t
@@ -178,17 +171,6 @@
 (use-package ace-window
   :ensure t
   :bind ("M-o" . ace-window)) ; 替换原生的 M-o
-
-(use-package pdf-tools
-  :ensure t
-  :mode ("\\.pdf\\'" . pdf-view-mode)
-  :config
-  (pdf-tools-install))
-
-(use-package nov
-  :ensure t
-  :mode ("\\.epub\\'" . nov-mode))
-
 
 (use-package marginalia
   :ensure t
@@ -297,29 +279,6 @@
   (setq org-capture-templates
         '(("t" "Todo" entry (file org-default-notes-file)
            "* TODO %?\n%U\n"))))
-
-(use-package appt
-  :ensure nil
-  :after org
-  :init
-  (setq appt-message-warning-time 15
-        appt-display-interval 5
-        appt-display-mode-line t
-        appt-display-format 'window
-        appt-audible nil)
-  :config
-  (defun my/org-appt-refresh ()
-    "Refresh appointment reminders from Org agenda files."
-    (interactive)
-    (org-agenda-to-appt t))
-  (my/org-appt-refresh)
-  (appt-activate 1)
-  (add-hook 'org-finalize-agenda-hook #'my/org-appt-refresh)
-  (add-hook 'org-capture-after-finalize-hook #'my/org-appt-refresh)
-  (add-hook 'after-save-hook
-            (lambda ()
-              (when (derived-mode-p 'org-mode)
-                (my/org-appt-refresh)))))
 
 (use-package project
   :ensure nil ; 内置
@@ -446,20 +405,68 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   :config
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
-
-
-
-(use-package rust-mode
+;;; -------------------- 缩进竖线 (≈ nvim indent-blankline 的竖线) --------------------
+;; 只要各层竖线，不要作用域下划线。
+;; macOS NS Emacs 对 stipple 支持差 → prefer-character 用 │。
+(use-package indent-bars
   :ensure t
-  :mode "\\.rs\\'")
+  :hook ((prog-mode . indent-bars-mode)
+         (yaml-mode . indent-bars-mode)
+         (yaml-ts-mode . indent-bars-mode)
+         (conf-mode . indent-bars-mode))
+  :custom
+  (indent-bars-pattern ".")
+  (indent-bars-width-frac 0.25)
+  (indent-bars-pad-frac 0.1)
+  (indent-bars-prefer-character t)
+  (indent-bars-no-stipple-char ?\│)
+  (indent-bars-display-on-blank-lines t)
+  (indent-bars-color '("#5c6370" :blend 0.5))
+  (indent-bars-color-by-depth
+   '(:palette ("#E06C75" "#E5C07B" "#61AFEF" "#D19A66"
+               "#98C379" "#C678DD" "#56B6C2")
+     :blend 0.8))
+  (indent-bars-highlight-current-depth
+   '(:color "#61AFEF" :blend 0.85))
+  (indent-bars-highlight-selection-method 'context)
+  ;; 不用 treesit scope 淡化，避免和“下划线 scope”混在一起
+  (indent-bars-treesit-support nil))
+
+;; .rs 固定走内置 rust-ts-mode（tree-sitter），不再用 MELPA rust-mode。
+;; 需已安装 rust grammar：~/.config/emacs/tree-sitter/libtree-sitter-rust.*
+;; 缺失时: M-x my/treesit-install-grammars 或
+;;         M-x treesit-install-language-grammar RET rust
+(use-package rust-ts-mode
+  :ensure nil
+  :mode "\\.rs\\'"
+  :init
+  ;; 即使其它包注册了 rust-mode，也优先 remap 到 ts 版
+  (add-to-list 'major-mode-remap-alist '(rust-mode . rust-ts-mode))
+  :config
+  (unless (treesit-language-available-p 'rust)
+    (display-warning
+     'rust-ts-mode
+     "Rust tree-sitter grammar 未安装。请执行: M-x treesit-install-language-grammar RET rust"
+     :warning)))
+
+;;; Snippet：lsp-enable-snippet 需要 yasnippet 才真正展开
+(use-package yasnippet
+  :ensure t
+  :hook (prog-mode . yas-minor-mode)
+  :config
+  (yas-reload-all))
+
+(use-package yasnippet-snippets
+  :ensure t
+  :after yasnippet)
 
 ;;; -------------------- LSP (lsp-mode) --------------------
 (use-package lsp-mode
   :ensure t
   :commands (lsp lsp-deferred)
-  :hook ((rust-mode . lsp-deferred)
-         (rust-ts-mode . lsp-deferred)
+  :hook ((rust-ts-mode . lsp-deferred)
          (c-mode . lsp-deferred)
+
          (c-ts-mode . lsp-deferred)
          (c++-mode . lsp-deferred)
          (c++-ts-mode . lsp-deferred)
@@ -479,14 +486,15 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   :init
   (setq lsp-keymap-prefix "C-c l")
   :custom
-  (lsp-enable-snippet t)
+  (lsp-enable-snippet t)              ; 与 yasnippet 对齐
   (lsp-headerline-breadcrumb-enable t)
   (lsp-auto-guess-root t)
   (lsp-completion-provider :capf)
   (lsp-session-file (expand-file-name "lsp-session-v1" my/var-dir))
   (lsp-server-install-dir (expand-file-name "lsp-server/" my/var-dir))
+  ;; Python 用 lsp-pyright，不必再加载 pylsp 客户端
   (lsp-client-packages
-   '(lsp-clangd lsp-javascript lsp-pylsp lsp-rust lsp-java lsp-css))
+   '(lsp-clangd lsp-javascript lsp-rust lsp-java lsp-css))
   :bind (:map lsp-mode-map
               ("C-c r" . lsp-rename)
               ("C-c h" . lsp-describe-thing-at-point)
@@ -527,18 +535,9 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   (doom-modeline-major-mode-icon t)
   (doom-modeline-buffer-file-name-style 'truncate-with-project)) ; 智能显示路径
 
-
-;; === vterm terminal ===
-(use-package vterm
-  :ensure t
-  :custom
-  ;; :custom 只接受 (变量 值),不能写 setq——之前那样写等于没生效。
-  (vterm-kill-buffer-on-exit t)
-  (vterm-shell "/bin/zsh")
-  :config
-  ;; 平滑滚动是全局行为(不是 vterm 变量),放 :config 里真正开启。
+;; 平滑滚动（全局，不绑在某个包上）
+(when (fboundp 'pixel-scroll-precision-mode)
   (pixel-scroll-precision-mode 1))
-
 
 ;; === Git ===
 (use-package magit
@@ -629,11 +628,4 @@ With ARG, move forward ARG-1 lines first."
 (load-theme 'modus-vivendi t)
 (when (fboundp 'my/corfu-setup-faces)
   (my/corfu-setup-faces))
-
-;; 放在最后一行
-;; LSP 性能：提高子进程单次读取上限，减轻 JSON 推送卡顿。
-(setq read-process-output-max (* 1024 1024))
-;; 启动后把 GC 阈值提到对 LSP 更友好的值。
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (setq gc-cons-threshold (* 100 1024 1024))))
+;; GC / read-process-output-max 只在 early-init.el 配置，避免重复。

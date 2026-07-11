@@ -42,20 +42,15 @@
       inhibit-startup-echo-area-message user-login-name
       initial-scratch-message nil)
 
-;; 初始内存优化，减少垃圾回收GC频率
-;; 通过降低垃圾回收频率来加快启动速度
-;; 默认为800KB
-;; 同时lsp-mode 也需要大量空间
-;; See <https://emacs-lsp.github.io/lsp-mode/page/performance/#increase-the-amount-of-data-which-emacs-reads-from-the-process>
+;; 启动阶段抬高 GC，减少启动时频繁回收；启动后再降到对 LSP 友好的值。
+;; See <https://emacs-lsp.github.io/lsp-mode/page/performance/>
 (setq gc-cons-threshold (* 128 1024 1024))
+;; 默认 4KB 太小，LSP JSON 推送会卡；1MB 足够（不必 64MB）
+(setq read-process-output-max (* 1024 1024))
 
-;; 增加emacs从进程读取的数据量
-;; emacs默认为4k，但是对于language server来说太低了
-;; See <https://emacs-lsp.github.io/lsp-mode/page/performance/#increase-the-amount-of-data-which-emacs-reads-from-the-process>
-(setq read-process-output-max (* 64 1024 1024))
-
-(add-hook 'emacs-startup-hook (lambda()
-                                      (setq gc-cons-threshold(* 16 1024 1024))))
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 100 1024 1024))))
 
 
 
@@ -103,22 +98,6 @@
       (set-fontset-font t charset (font-spec :family "Maple Mono NF CN")))
     (setq face-font-rescale-alist '(("Maple Mono NF CN" . 1.0))))
   )
-
-;; 旧字体配置 (保留备用)
-;; 英文字体:https://monaspace.githubnext.com/
-;; 中文字体:https://github.com/lxgw/LxgwWenKai
-;; (defun my/apply-font-config ()
-;;   (interactive)
-;;   (when (display-graphic-p)
-;;     (set-face-attribute 'default nil
-;; 			:family "Monaspace Neon"
-;; 			:height 140
-;; 			:weight 'normal
-;; 			)
-;;     (dolist (charset '(kana han symbol cjk-misc bopomofo))
-;;       (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono")))
-;;     (setq face-font-rescale-alist '(("LXGW WenKai Mono" . 1.25))))
-;;   )
 
 (if (daemonp)
     (add-hook 'server-after-make-frame-hook #'my/apply-font-config)
