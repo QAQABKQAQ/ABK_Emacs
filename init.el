@@ -30,6 +30,37 @@
         kept-new-versions 6
         kept-old-versions 2))
 
+;; Emacs 28+ 默认 write-region-inhibit-fsync=t：save 后只写到 OS 页缓存，
+;; 不强制 fsync。多数情况立刻可读，但在外置盘 / 网络盘 / 某些文件监视器 /
+;; 与其它编辑器并用时，会出现「Emacs 已保存、磁盘侧晚一步才看到」的感觉。
+;; 设为 nil 让 C-x C-s 真正刷盘（大文件略慢，可接受）。
+(setq write-region-inhibit-fsync nil)
+;; 先写临时文件再 rename，避免写到一半崩溃留下半成品；也减少“看到旧内容”的窗口。
+(setq-default file-precious-flag t)
+;; 自动保存(#file#) 只进 ~/.config/emacs/auto-save/，不是目标文件本身。
+;; 真正更新项目里的文件必须 C-x C-s（或 s-s 等绑到 save-buffer 的键）。
+(setq auto-save-default t
+      auto-save-timeout 20
+      auto-save-interval 200)
+
+(defun my/verify-buffer-matches-disk ()
+  "保存后核对 buffer 与磁盘是否一致；不一致会在 echo area 警告。
+用于抓『以为保存了、磁盘仍是上一次内容』这类问题。"
+  (when (and buffer-file-name (file-exists-p buffer-file-name))
+    (let ((buf (buffer-substring-no-properties (point-min) (point-max)))
+          (disk (with-temp-buffer
+                  (insert-file-contents-literally buffer-file-name)
+                  (buffer-string))))
+      (unless (string= buf disk)
+        (message "⚠ 保存后磁盘与 buffer 不一致: %s (disk=%dB buf=%dB)"
+                 buffer-file-name (length disk) (length buf))
+        (display-warning
+         'my-save
+         (format "Save mismatch: %s\nDisk still has different content than this buffer."
+                 buffer-file-name)
+         :warning)))))
+(add-hook 'after-save-hook #'my/verify-buffer-matches-disk)
+
 
 (require 'package)
 
@@ -117,6 +148,7 @@
     "C-c h" "查看符号文档(lsp)"
     "C-c f" "格式化 buffer"
     "C-c d" "悬浮文档(lsp-ui)"
+    "C-c j" "复制当前行/选区到下方(duplicate-dwim)"
     "C-x g" "Magit status"
     "C-x SPC" "矩形选择"
     "C-x r" '("矩形/寄存器" . "矩形编辑和寄存器")
@@ -149,6 +181,67 @@
   (vertico-preselect 'directory)
   :init
   (vertico-mode))
+
+(use-package kanagawa-themes
+  :ensure t
+  :config
+  ;; wave / dragon / lotus
+  (load-theme 'kanagawa-dragon t)
+  ;; Kanagawa + lsp breadcrumb 会「目录段突然发黑、只有当前文件名还正常」：
+  ;; 1) path-face 只设了接近纯黑的 :background (bg-m3=#0d0c0c)，几乎不设前景
+  ;; 2) 更关键：LSP 诊断汇总后，父目录切到 path-error-face，主题把它的
+  ;;    :foreground 设成 bg-p1=#282727（深灰），叠在 #0d0c0c 上几乎看不见
+  ;; 3) 当前文件若无诊断仍走 path-face / header-line 继承，所以「文件名还正常」
+  ;; 诊断是异步的，所以会表现为「不知道什么时候突然变黑」。
+  (defun my/fix-lsp-breadcrumb-faces (&rest _)
+    "Force readable colors for all lsp-headerline breadcrumb faces."
+    (let* ((fg (or (face-foreground 'header-line nil t)
+                   (face-foreground 'default nil t)
+                   "#c5c9c5"))
+           (bg (or (face-background 'header-line nil t)
+                   (face-background 'mode-line nil t)
+                   (face-background 'default nil t)
+                   "#181616"))
+           ;; 诊断态用主题强调色，但仍保证对比度（不复用 bg-* 当前景）
+           (err "#c4746e")
+           (warn "#c4b28a")
+           (info "#8ba4b0")
+           (hint "#8ea4a2")
+           (specs `((lsp-headerline-breadcrumb-path-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-separator-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-project-prefix-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-unknown-project-prefix-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-symbols-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-path-error-face ,err ,bg)
+                    (lsp-headerline-breadcrumb-path-warning-face ,warn ,bg)
+                    (lsp-headerline-breadcrumb-path-info-face ,info ,bg)
+                    (lsp-headerline-breadcrumb-path-hint-face ,hint ,bg)
+                    (lsp-headerline-breadcrumb-symbols-error-face ,err ,bg)
+                    (lsp-headerline-breadcrumb-symbols-warning-face ,warn ,bg)
+                    (lsp-headerline-breadcrumb-symbols-info-face ,info ,bg)
+                    (lsp-headerline-breadcrumb-symbols-hint-face ,hint ,bg))))
+      (dolist (spec specs)
+        (let ((face (nth 0 spec))
+              (face-fg (nth 1 spec))
+              (face-bg (nth 2 spec)))
+          (when (facep face)
+            ;; face-override-spec 优先于主题，避免主题重算后又变黑
+            (face-spec-set face
+                           `((t :foreground ,face-fg
+                                :background ,face-bg
+                                :underline nil
+                                :box nil
+                                :inherit unspecified))
+                           'face-override-spec))))))
+  (my/fix-lsp-breadcrumb-faces)
+  (with-eval-after-load 'lsp-headerline
+    (my/fix-lsp-breadcrumb-faces))
+  (with-eval-after-load 'lsp-mode
+    (my/fix-lsp-breadcrumb-faces))
+  ;; 主题重载会重算 face，再刷一次
+  (advice-add 'enable-theme :after #'my/fix-lsp-breadcrumb-faces)
+  (advice-add 'load-theme :after #'my/fix-lsp-breadcrumb-faces))
+
 
 (use-package vertico-multiform
   :ensure nil
@@ -318,6 +411,29 @@
     (when (derived-mode-p 'prog-mode)
       (my/set-code-indent-width))))
 
+;;; -------------------- 注释 / 括号（编辑器内置，不是 LSP） --------------------
+;; 注释续行：默认 M-j（comment-indent-new-line），不改 RET。
+;; 括号自动成对：electric-pair-mode（敲 ( 自动补 )，光标夹在中间）。
+(setq comment-empty-lines t
+      comment-multi-line t)
+(electric-pair-mode 1)
+;; 可选：高亮匹配括号（默认多数情况已开，再确保一次）
+(show-paren-mode 1)
+
+;;; 符号「合并」= 字体连字 ligature（也不是 LSP）
+;; 需要字体本身支持（你用的 Maple Mono NF 通常支持）。
+(use-package ligature
+  :ensure t
+  :config
+  (ligature-set-ligatures
+   'prog-mode
+   '("--" "---" "==" "===" "!=" "!==" "<=" ">="
+     "&&" "||" "->" "=>" "::" ".." "..."
+     "/*" "*/" "//" "///"
+     "+=" "-=" "*=" "/=" "%="
+     "<<" ">>" "|||" "&&&"))
+  (global-ligature-mode t))
+
 (defun my/format-buffer ()
   "Format current buffer on demand.
 
@@ -370,33 +486,32 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   (corfu-popupinfo-mode 1)
   (corfu-history-mode 1)
   (add-to-list 'savehist-additional-variables 'corfu-history)
+  ;; 不硬编码颜色：Corfu 默认 face 继承主题。
+  ;;
+  ;; 光标在 ) ] } 上/前补全时，Corfu 插入 + LSP exit-fn 可能二次
+  ;; delete-region 把闭括号吃掉。插入前后把闭括号记下来，丢了就补回。
+  (defun my/completion-save-closers ()
+    "光标处及之后连续的闭括号/引号。"
+    (buffer-substring-no-properties
+     (point)
+     (save-excursion
+       (skip-chars-forward "])}>'\"`")
+       (point))))
 
-  ;; 与 modus-vivendi 协调的配色（深色、选中项更醒目）
-  (defun my/corfu-setup-faces ()
-    (set-face-attribute 'corfu-default nil
-                        :inherit 'default
-                        :background "#16161e"
-                        :foreground "#c0caf5")
-    (set-face-attribute 'corfu-current nil
-                        :background "#2a2a3d"
-                        :foreground "#7dcfff"
-                        :weight 'semi-bold
-                        :extend t)
-    (set-face-attribute 'corfu-border nil
-                        :background "#3d59a1")
-    (set-face-attribute 'corfu-bar nil
-                        :background "#7aa2f7")
-    (set-face-attribute 'corfu-annotations nil
-                        :foreground "#565f89"
-                        :slant 'italic)
-    (when (facep 'corfu-popupinfo)
-      (set-face-attribute 'corfu-popupinfo nil
-                          :background "#12121a"
-                          :foreground "#a9b1d6")))
-  (my/corfu-setup-faces)
-  ;; 换主题后重刷 Corfu 脸（Emacs 无标准 after-load-theme-hook）
-  (advice-add 'load-theme :after
-              (lambda (&rest _) (my/corfu-setup-faces))))
+  (defun my/completion-restore-closers (closers)
+    "若 CLOSER 被补全吃掉则插回，光标仍留在括号内侧。"
+    (when (and closers
+               (not (string-empty-p closers))
+               (not (looking-at (regexp-quote closers))))
+      (insert closers)
+      (backward-char (length closers))))
+
+  (defun my/corfu-insert-preserve-closers (orig status)
+    (let ((closers (my/completion-save-closers)))
+      (funcall orig status)
+      (my/completion-restore-closers closers)))
+  (advice-add #'corfu--insert :around #'my/corfu-insert-preserve-closers)
+  )
 
 ;; 候选项左侧类型图标（函数 / 变量 / 模块…）
 (use-package nerd-icons-corfu
@@ -487,9 +602,18 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   (setq lsp-keymap-prefix "C-c l")
   :custom
   (lsp-enable-snippet t)              ; 与 yasnippet 对齐
+  ;; :insert 用较短 range，避免 :replace 把光标后的 ) 算进替换区
+  (lsp-completion-default-behaviour :insert)
   (lsp-headerline-breadcrumb-enable t)
   (lsp-auto-guess-root t)
   (lsp-completion-provider :capf)
+  ;; 默认 t：保存前会向 LSP 发 willSaveWaitUntil，并把 server 返回的 edits
+  ;; 写回 buffer 再落盘。若 rust-analyzer 等与 buffer 短暂不同步，可能把
+  ;; 「这一次」的编辑冲掉，磁盘上就像还停在上一次保存。先关掉更安全；
+  ;; 需要 server 在保存前改文件（organize imports 等）再改回 t。
+  (lsp-before-save-edits nil)
+  (lsp-format-buffer-on-save nil)
+  (lsp-fix-all-on-save nil)
   (lsp-session-file (expand-file-name "lsp-session-v1" my/var-dir))
   (lsp-server-install-dir (expand-file-name "lsp-server/" my/var-dir))
   ;; Python 用 lsp-pyright，不必再加载 pylsp 客户端
@@ -502,7 +626,19 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
               ("C-c f" . my/format-buffer))
   :config
   (require 'lsp-pyright nil t)
-  (lsp-enable-which-key-integration t))
+  (lsp-enable-which-key-integration t)
+  (when (fboundp 'my/fix-lsp-breadcrumb-faces)
+    (my/fix-lsp-breadcrumb-faces))
+
+  ;; LSP 确认补全时的 exit-fn 会再 delete-region 一次，常把 ) 删掉
+  (defun my/lsp-exit-fn-preserve-closers (orig candidate status &optional candidates)
+    (let ((closers (and (fboundp 'my/completion-save-closers)
+                        (my/completion-save-closers))))
+      (funcall orig candidate status candidates)
+      (when (fboundp 'my/completion-restore-closers)
+        (my/completion-restore-closers closers))))
+  (advice-add 'lsp-completion--exit-fn :around
+              #'my/lsp-exit-fn-preserve-closers))
 
 (use-package lsp-ui
   :ensure t
@@ -618,14 +754,9 @@ With ARG, move forward ARG-1 lines first."
 ;; ==== key ====
 (global-set-key (kbd "<f2>") 'open-init-file)
 (global-set-key (kbd "<f5>") 'my/project-run)
+;; 复制当前行到下一行；有选区则复制选区（Emacs 29+ 内置）
+(global-set-key (kbd "C-c j") #'duplicate-dwim)
 
-;; ==== theme ====
-;; 让主题自带的补全/匹配高亮更醒目（与 Corfu 配合）
-(setq modus-themes-completions
-      '((matches . (extrabold underline))
-        (selection . (semibold accented intense))
-        (popup . (accented intense))))
-(load-theme 'modus-vivendi t)
-(when (fboundp 'my/corfu-setup-faces)
-  (my/corfu-setup-faces))
-;; GC / read-process-output-max 只在 early-init.el 配置，避免重复。
+;; 主题在 kanagawa-themes 的 use-package 里加载。
+;; Corfu 不硬编码颜色，换主题自动跟。
+;; GC / read-process-output-max 只在 early-init.el。
