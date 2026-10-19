@@ -17,6 +17,22 @@
 (setq ring-bell-function 'ignore)  ; 完全禁用bell
 (setq visible-bell nil)            ; 也禁用可视化bell
 
+;; macOS 终端模式：让 M-w / C-w 同步到系统剪贴板。
+(when (eq system-type 'darwin)
+  (defun my/macos-copy-to-clipboard (text)
+    "Copy TEXT to the macOS clipboard from terminal or graphical frames."
+    (if (display-graphic-p)
+        (gui-select-text text)
+      (let ((coding-system-for-write 'utf-8-unix)
+            (process-environment (cons "LC_ALL=en_US.UTF-8" process-environment))
+            (default-directory temporary-file-directory))
+        (with-temp-buffer
+          (insert text)
+          (unless (eq 0 (call-process-region
+                         (point-min) (point-max) "/usr/bin/pbcopy" nil nil nil))
+            (error "无法通过 pbcopy 写入 macOS 剪贴板"))))))
+  (setq interprogram-cut-function #'my/macos-copy-to-clipboard))
+
 ;; 把 Emacs 生成的备份/自动保存文件集中放在配置目录里，避免污染项目目录。
 (let ((backup-dir (expand-file-name "backups/" user-emacs-directory))
       (auto-save-dir (expand-file-name "auto-save/" user-emacs-directory)))
@@ -47,17 +63,21 @@
   "保存后核对 buffer 与磁盘是否一致；不一致会在 echo area 警告。
 用于抓『以为保存了、磁盘仍是上一次内容』这类问题。"
   (when (and buffer-file-name (file-exists-p buffer-file-name))
-    (let ((buf (buffer-substring-no-properties (point-min) (point-max)))
-          (disk (with-temp-buffer
-                  (insert-file-contents-literally buffer-file-name)
-                  (buffer-string))))
+    (let* ((file buffer-file-name)
+           (coding-system-for-read buffer-file-coding-system)
+           (buf (save-restriction
+                  (widen)
+                  (buffer-substring-no-properties (point-min) (point-max))))
+           (disk (with-temp-buffer
+                   (insert-file-contents file)
+                   (buffer-string))))
       (unless (string= buf disk)
-        (message "⚠ 保存后磁盘与 buffer 不一致: %s (disk=%dB buf=%dB)"
-                 buffer-file-name (length disk) (length buf))
+        (message "⚠ 保存后磁盘与 buffer 不一致: %s (disk=%d chars buf=%d chars)"
+                 file (length disk) (length buf))
         (display-warning
          'my-save
          (format "Save mismatch: %s\nDisk still has different content than this buffer."
-                 buffer-file-name)
+                 file)
          :warning)))))
 (add-hook 'after-save-hook #'my/verify-buffer-matches-disk)
 
@@ -137,6 +157,7 @@
     "C-x p b" "项目 buffer 切换"
     "C-x p c" "项目根目录编译"
     "C-<return>" "触发补全"
+    "C-c TAB" "触发补全（终端可用）"
     "S-SPC" "orderless 分隔符"
     "M-n" "下一个诊断(flycheck)"
     "M-p" "上一个诊断(flycheck)"
@@ -149,6 +170,8 @@
     "C-c f" "格式化 buffer"
     "C-c d" "悬浮文档(lsp-ui)"
     "C-c j" "复制当前行/选区到下方(duplicate-dwim)"
+    "C-c v" "在下方新建终端"
+    "C-c x" "关闭终端会话和窗口"
     "C-x g" "Magit status"
     "C-x SPC" "矩形选择"
     "C-x r" '("矩形/寄存器" . "矩形编辑和寄存器")
@@ -185,6 +208,24 @@
 (use-package kanagawa-themes
   :ensure t
   :config
+  ;; 当前主题把部分颜色设为 nil；Emacs 要求未指定的颜色使用 unspecified。
+  ;; 在注册 face 前修正，避免加载主题、Corfu 或新建 frame 时反复警告。
+  (defun my/kanagawa-normalize-face-colors (args)
+    "Replace nil foreground/background colors in Kanagawa theme ARGS."
+    (when (memq (car args) '(kanagawa-wave kanagawa-dragon kanagawa-lotus))
+      (setq args (copy-tree args))
+      (dolist (face-spec (cdr args))
+        (dolist (display-spec (cadr face-spec))
+          (let ((attrs (if (listp (cadr display-spec))
+                           (cadr display-spec)
+                         (cdr display-spec))))
+            (dolist (attribute '(:foreground :background))
+              (let ((entry (plist-member attrs attribute)))
+                (when (and entry (null (cadr entry)))
+                  (setcar (cdr entry) 'unspecified))))))))
+    args)
+  (advice-add 'custom-theme-set-faces :filter-args
+              #'my/kanagawa-normalize-face-colors)
   ;; wave / dragon / lotus
   (load-theme 'kanagawa-dragon t)
   ;; Kanagawa + lsp breadcrumb 会「目录段突然发黑、只有当前文件名还正常」：
@@ -263,7 +304,64 @@
 ;; 窗口切换
 (use-package ace-window
   :ensure t
-  :bind ("M-o" . ace-window)) ; 替换原生的 M-o
+        :bind ("M-o" . ace-window)) ; 替换原生的 M-o
+
+;;; 下方终端：每次新建会话，关闭时结束进程。
+(defun my/vterm-new-below ()
+  "Open a new Vterm session in the bottom window."
+  (interactive)
+  (let ((display-buffer-overriding-action
+         '((display-buffer-in-side-window)
+           (side . bottom)
+           (slot . 0)
+           (window-height . 0.3))))
+    (vterm-other-window t)))
+
+(defun my/vterm-close ()
+  "Close the current or visible Vterm session and its window."
+  (interactive)
+  (let ((window
+         (if (derived-mode-p 'vterm-mode)
+             (selected-window)
+           (get-window-with-predicate
+            (lambda (win)
+              (with-current-buffer (window-buffer win)
+                (derived-mode-p 'vterm-mode)))
+            nil (selected-frame)))))
+    (unless window
+      (user-error "当前没有打开的 vterm 窗口"))
+    (with-selected-window window
+      (let ((buffer (current-buffer))
+            (process (get-buffer-process (current-buffer))))
+        ;; C-c x 明确结束会话，不再询问是否终止终端进程。
+        (when process
+          (set-process-query-on-exit-flag process nil))
+        (when (kill-buffer buffer)
+          (when (and (window-live-p window) (not (one-window-p t)))
+            (delete-window window)))))))
+
+(use-package vterm
+  :ensure t
+  :commands vterm-other-window
+  :bind (("C-c v" . my/vterm-new-below)
+         ("C-c x" . my/vterm-close)
+         :map vterm-mode-map
+         ("C-c v" . my/vterm-new-below)
+         ("C-c x" . my/vterm-close)))
+
+;;; 居中辅助留白
+(use-package olivetti
+        :ensure t
+        :custom
+        (olivetti-body-width 100) ; <字符宽度> 留白
+        (olivetti-style nil ) ; 左右留白
+        (olivetti-mode-on-hook nil) ; 长显示方式
+        :hook ((prog-mode . olivetti-mode)
+                      (text-mode . olivetti-mode)
+                      (dired-mode . olivetti-mode))
+        :bind ("C-c z" . olivetti-mode)
+
+        )
 
 (use-package marginalia
   :ensure t
@@ -284,6 +382,13 @@
          ("C-s" . consult-line))           ; 替换原生搜索，带实时预览
   :config
   (setq consult-preview-key 'any)) ; 实时预览
+
+
+
+
+
+
+
 
 
 ;;; -------------------- tree-sitter --------------------
@@ -453,7 +558,8 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   (global-corfu-mode)
   :bind
   (:map global-map
-        ("C-<return>" . completion-at-point))
+        ("C-<return>" . completion-at-point)
+        ("C-c TAB" . completion-at-point))
   (:map corfu-map
         ("TAB" . corfu-next)
         ("S-TAB" . corfu-previous)
@@ -513,12 +619,31 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   (advice-add #'corfu--insert :around #'my/corfu-insert-preserve-closers)
   )
 
+;; Emacs 30 及更早版本的终端需要使用 overlay 绘制补全弹窗。
+(use-package corfu-terminal
+  :ensure t
+  :if (and (not (display-graphic-p))
+           (not (featurep 'tty-child-frames)))
+  :after corfu
+  :config
+  (corfu-terminal-mode 1))
+
 ;; 候选项左侧类型图标（函数 / 变量 / 模块…）
 (use-package nerd-icons-corfu
   :ensure t
   :after corfu
   :config
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+
+;; 终端补全菜单：缩窄、减少遮挡，避免撑满 Olivetti 的正文区域。
+(unless (display-graphic-p)
+  (setq corfu-count 10
+        corfu-min-width 24
+        corfu-max-width 70
+        corfu-terminal-position-right-margin 2)
+  ;; 左侧已有类型图标；保留类型详情和导入来源，隐藏重复的文字标签。
+  (with-eval-after-load 'lsp-completion
+    (setq lsp-completion-show-kind nil)))
 
 ;;; -------------------- 缩进竖线 (≈ nvim indent-blankline 的竖线) --------------------
 ;; 只要各层竖线，不要作用域下划线。
@@ -606,7 +731,8 @@ Prefer lsp-mode formatting when available, else reindent the whole buffer."
   (lsp-completion-default-behaviour :insert)
   (lsp-headerline-breadcrumb-enable t)
   (lsp-auto-guess-root t)
-  (lsp-completion-provider :capf)
+  ;; Corfu 使用 LSP 的 CAPF；:none 只关闭 Company 自动配置。
+  (lsp-completion-provider :none)
   ;; 默认 t：保存前会向 LSP 发 willSaveWaitUntil，并把 server 返回的 edits
   ;; 写回 buffer 再落盘。若 rust-analyzer 等与 buffer 短暂不同步，可能把
   ;; 「这一次」的编辑冲掉，磁盘上就像还停在上一次保存。先关掉更安全；
