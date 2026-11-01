@@ -1,0 +1,57 @@
+*~
+q
+
+\#*\#
+*.elc
+
+# 缓存目录
+.cache/
+auto-save-list/
+.ctags.d/
+
+# 会话和状态文件
+.lsp-session-v1
+.mc-lists.el
+.tags
+ido.last
+recentf
+tramp
+ielm-history.eld
+
+# 包目录 (可通过 package-install 自动安装)
+elpa/
+
+# Tree-sitter 编译库
+tree-sitter/
+
+# 运行时数据
+var/
+etc/
+transient/
+url/
+
+# IDE/语言服务器缓存
+eclipse.jdt.ls/
+
+
+# 版本控制
+.jj/
+auto-save-list/
+/eshell/
+/site-lisp/
+
+# 本地会话、历史、备份及个人数据
+/.local/
+/local/
+/backups/
+/auto-save/
+/org/
+/projects
+/.claude/
+
+# 本机编译产物
+/eln-cache/
+*.eln
+*.so
+*.dylib
+.DS_Store

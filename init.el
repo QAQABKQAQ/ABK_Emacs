@@ -1,0 +1,951 @@
+
+;;===================
+;; emacs init       |
+;; Author: Ephemera |
+;;===================
+
+
+
+
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+
+
+;; =====ENV=====
+;; 欢迎页 / GC / 代理 在 early-init.el，这里不重复。
+
+;; 禁用系统警告音(macOS上会从内置扬声器发出)
+(setq ring-bell-function 'ignore)  ; 完全禁用bell
+(setq visible-bell nil)            ; 也禁用可视化bell
+
+;; macOS 终端模式：M-w / C-w 写入系统剪贴板，C-y 读取系统剪贴板。
+(when (eq system-type 'darwin)
+  (defvar my/macos-last-clipboard-text nil
+    "Last clipboard text copied or imported by terminal Emacs.")
+
+  (defun my/macos-copy-to-clipboard (text)
+    "Copy TEXT to the macOS clipboard from terminal or graphical frames."
+    (if (display-graphic-p)
+        (gui-select-text text)
+      (let ((coding-system-for-write 'utf-8-unix)
+            (process-environment (cons "LC_ALL=en_US.UTF-8" process-environment))
+            (default-directory temporary-file-directory))
+        (with-temp-buffer
+          (insert text)
+          (unless (eq 0 (call-process-region
+                         (point-min) (point-max) "/usr/bin/pbcopy" nil nil nil))
+            (error "无法通过 pbcopy 写入 macOS 剪贴板"))
+          (setq my/macos-last-clipboard-text text)))))
+
+  (defun my/macos-paste-from-clipboard ()
+    "Return new macOS clipboard text, or nil to use the existing kill ring."
+    (if (display-graphic-p)
+        (gui-selection-value)
+      (let ((coding-system-for-read 'utf-8-unix)
+            (process-environment (cons "LC_ALL=en_US.UTF-8" process-environment))
+            (default-directory temporary-file-directory))
+        (with-temp-buffer
+          (when (eq 0 (call-process "/usr/bin/pbpaste" nil t nil))
+            (let ((text (buffer-string)))
+              (unless (equal text my/macos-last-clipboard-text)
+                (setq my/macos-last-clipboard-text text)
+                (unless (string-empty-p text)
+                  text))))))))
+
+  (setq interprogram-cut-function #'my/macos-copy-to-clipboard
+        interprogram-paste-function #'my/macos-paste-from-clipboard))
+
+;; 把 Emacs 生成的备份/自动保存文件集中放在配置目录里，避免污染项目目录。
+(let ((backup-dir (expand-file-name "backups/" user-emacs-directory))
+      (auto-save-dir (expand-file-name "auto-save/" user-emacs-directory)))
+  (make-directory backup-dir t)
+  (make-directory auto-save-dir t)
+  (setq backup-directory-alist `(("." . ,backup-dir))
+        auto-save-file-name-transforms `((".*" ,auto-save-dir t))
+        backup-by-copying t
+        version-control t
+        delete-old-versions t
+        kept-new-versions 6
+        kept-old-versions 2))
+
+;; Emacs 28+ 默认 write-region-inhibit-fsync=t：save 后只写到 OS 页缓存，
+;; 不强制 fsync。多数情况立刻可读，但在外置盘 / 网络盘 / 某些文件监视器 /
+;; 与其它编辑器并用时，会出现「Emacs 已保存、磁盘侧晚一步才看到」的感觉。
+;; 设为 nil 让 C-x C-s 真正刷盘（大文件略慢，可接受）。
+(setq write-region-inhibit-fsync nil)
+;; 先写临时文件再 rename，避免写到一半崩溃留下半成品；也减少“看到旧内容”的窗口。
+(setq-default file-precious-flag t)
+;; 自动保存(#file#) 只进 ~/.config/emacs/auto-save/，不是目标文件本身。
+;; 真正更新项目里的文件必须 C-x C-s（或 s-s 等绑到 save-buffer 的键）。
+(setq auto-save-default t
+      auto-save-timeout 20
+      auto-save-interval 200)
+
+(defun my/verify-buffer-matches-disk ()
+  "保存后核对 buffer 与磁盘是否一致；不一致会在 echo area 警告。
+用于抓『以为保存了、磁盘仍是上一次内容』这类问题。"
+  (when (and buffer-file-name (file-exists-p buffer-file-name))
+    (let* ((file buffer-file-name)
+           (coding-system-for-read buffer-file-coding-system)
+           (buf (save-restriction
+                  (widen)
+                  (buffer-substring-no-properties (point-min) (point-max))))
+           (disk (with-temp-buffer
+                   (insert-file-contents file)
+                   (buffer-string))))
+      (unless (string= buf disk)
+        (message "⚠ 保存后磁盘与 buffer 不一致: %s (disk=%d chars buf=%d chars)"
+                 file (length disk) (length buf))
+        (display-warning
+         'my-save
+         (format "Save mismatch: %s\nDisk still has different content than this buffer."
+                 file)
+         :warning)))))
+(add-hook 'after-save-hook #'my/verify-buffer-matches-disk)
+
+
+(require 'package)
+
+
+
+;; 代理查看 early-init.el
+(setq package-archives
+      '(("gnu"    . "https://mirrors.ustc.edu.cn/elpa/gnu/")
+        ("nongnu" . "https://mirrors.ustc.edu.cn/elpa/nongnu/")
+        ("melpa"  . "https://mirrors.ustc.edu.cn/elpa/melpa/")))
+(setq package-archive-priorities '(("melpa" . 10) ("gnu" . 5) ("nongnu" . 5)))
+
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
+
+;; =============
+
+
+(when (file-exists-p custom-file)
+  (load custom-file))
+
+;; ==== 会话持久化 ====
+;; var/ 已在 .gitignore 中忽略,不会污染仓库。
+(defconst my/var-dir (expand-file-name "var/" user-emacs-directory)
+  "集中存放运行时状态文件的目录。")
+(make-directory my/var-dir t)
+
+;; savehist: 记住 minibuffer 历史,让最近/高频候选在 Vertico 里排到前面。
+(use-package savehist
+  :ensure nil
+  :init
+  (setq savehist-file (expand-file-name "history" my/var-dir))
+  (savehist-mode 1))
+
+;; saveplace: 重开文件时把光标恢复到上次离开的位置。
+(use-package saveplace
+  :ensure nil
+  :init
+  (setq save-place-file (expand-file-name "places" my/var-dir))
+  (save-place-mode 1))
+
+;; recentf: 维护最近打开文件列表,喂给 consult-buffer 的「最近文件」区。
+(use-package recentf
+  :ensure nil
+  :init
+  (setq recentf-save-file (expand-file-name "recentf" my/var-dir)
+        recentf-max-saved-items 200)
+  (recentf-mode 1))
+
+
+(use-package which-key
+  :ensure nil
+  :init
+  (which-key-mode)
+  :config
+  ;; 只标注实际 bind 过的键，避免键位超前/写错前缀
+  (which-key-add-key-based-replacements
+    "C-c s" '("搜索" . "搜索相关命令")
+    "C-c !" '("诊断" . "诊断相关命令")
+    "C-c l" '("LSP" . "lsp-mode 命令")
+    "C-c c" "快速记录任务(org-capture)"
+    "C-c a" "查看任务清单(org-agenda)"
+    "M-g" '("跳转" . "跳转相关命令")
+    "C-x p" '("项目" . "项目相关命令")
+    "C-c s p" "项目全局搜索(consult-ripgrep)"
+    "C-c s b" "搜索当前项目 buffer(consult-project-buffer)"
+    "M-g g" "行跳转"
+    "M-g m" "跳转到标记点"
+    "M-g i" "跳转到当前文件的函数/定义"
+    "C-s" "行内搜索(consult-line)"
+    "M-o" "切换窗口(ace-window)"
+    "C-x p f" "项目内找文件"
+    "C-x p b" "项目 buffer 切换"
+    "C-x p c" "项目根目录编译"
+    "C-<return>" "触发补全"
+    "C-c TAB" "触发补全（终端可用）"
+    "S-SPC" "orderless 分隔符"
+    "M-n" "下一个诊断(flycheck)"
+    "M-p" "上一个诊断(flycheck)"
+    "C-c ! l" "诊断列表"
+    "M-." "跳转到定义(xref)"
+    "M-," "返回上一跳转"
+    "M-?" "查找引用"
+    "C-c r" "重命名符号(lsp)"
+    "C-c h" "查看符号文档(lsp)"
+    "C-c f" "格式化 buffer"
+    "C-c d" "悬浮文档(lsp-ui)"
+    "C-c j" "复制当前行/选区到下方(duplicate-dwim)"
+    "C-c v" "在下方新建终端"
+    "C-c x" "关闭终端会话和窗口"
+    "C-x g" "Magit status"
+    "C-x SPC" "矩形选择"
+    "C-x r" '("矩形/寄存器" . "矩形编辑和寄存器")
+    "C-x r t" "矩形每行插入字符串"
+    "C-x r k" "删除矩形"
+    "C-x r y" "粘贴矩形"
+    "C-x r N" "矩形行编号"
+    "C-c M-f" "头文件/源文件互跳"
+    "<f2>" "打开 init.el"
+    "<f5>" "项目运行(my/project-run)"))
+
+(use-package exec-path-from-shell
+  :ensure t
+  :config
+  (exec-path-from-shell-initialize)
+  (exec-path-from-shell-copy-envs
+   '("http_proxy" "https_proxy" "all_proxy" "HTTP_PROXY" "HTTPS_PROXY" "ALL_PROXY")))
+
+;; Git over SSH breaks in Emacs-launched shells unless we strip a few
+;; Emacs-specific env vars before delegating to the system ssh binary.
+(setenv "GIT_SSH_COMMAND"
+        (expand-file-name "~/.local/bin/git-ssh-clean-env"))
+
+
+
+
+(use-package vertico
+  :ensure t
+  :custom
+  (vertico-preselect 'directory)
+  :init
+  (vertico-mode))
+
+(use-package kanagawa-themes
+  :ensure t
+  :config
+  ;; 当前主题把部分颜色设为 nil；Emacs 要求未指定的颜色使用 unspecified。
+  ;; 在注册 face 前修正，避免加载主题、Corfu 或新建 frame 时反复警告。
+  (defun my/kanagawa-normalize-face-colors (args)
+    "Replace nil foreground/background colors in Kanagawa theme ARGS."
+    (when (memq (car args) '(kanagawa-wave kanagawa-dragon kanagawa-lotus))
+      (setq args (copy-tree args))
+      (dolist (face-spec (cdr args))
+        (dolist (display-spec (cadr face-spec))
+          (let ((attrs (if (listp (cadr display-spec))
+                           (cadr display-spec)
+                         (cdr display-spec))))
+            (dolist (attribute '(:foreground :background))
+              (let ((entry (plist-member attrs attribute)))
+                (when (and entry (null (cadr entry)))
+                  (setcar (cdr entry) 'unspecified))))))))
+    args)
+  (advice-add 'custom-theme-set-faces :filter-args
+              #'my/kanagawa-normalize-face-colors)
+  ;; wave / dragon / lotus
+  (load-theme 'kanagawa-dragon t)
+  ;; Kanagawa + lsp breadcrumb 会「目录段突然发黑、只有当前文件名还正常」：
+  ;; 1) path-face 只设了接近纯黑的 :background (bg-m3=#0d0c0c)，几乎不设前景
+  ;; 2) 更关键：LSP 诊断汇总后，父目录切到 path-error-face，主题把它的
+  ;;    :foreground 设成 bg-p1=#282727（深灰），叠在 #0d0c0c 上几乎看不见
+  ;; 3) 当前文件若无诊断仍走 path-face / header-line 继承，所以「文件名还正常」
+  ;; 诊断是异步的，所以会表现为「不知道什么时候突然变黑」。
+  (defun my/fix-lsp-breadcrumb-faces (&rest _)
+    "Force readable colors for all lsp-headerline breadcrumb faces."
+    (let* ((fg (or (face-foreground 'header-line nil t)
+                   (face-foreground 'default nil t)
+                   "#c5c9c5"))
+           (bg (or (face-background 'header-line nil t)
+                   (face-background 'mode-line nil t)
+                   (face-background 'default nil t)
+                   "#181616"))
+           ;; 诊断态用主题强调色，但仍保证对比度（不复用 bg-* 当前景）
+           (err "#c4746e")
+           (warn "#c4b28a")
+           (info "#8ba4b0")
+           (hint "#8ea4a2")
+           (specs `((lsp-headerline-breadcrumb-path-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-separator-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-project-prefix-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-unknown-project-prefix-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-symbols-face ,fg ,bg)
+                    (lsp-headerline-breadcrumb-path-error-face ,err ,bg)
+                    (lsp-headerline-breadcrumb-path-warning-face ,warn ,bg)
+                    (lsp-headerline-breadcrumb-path-info-face ,info ,bg)
+                    (lsp-headerline-breadcrumb-path-hint-face ,hint ,bg)
+                    (lsp-headerline-breadcrumb-symbols-error-face ,err ,bg)
+                    (lsp-headerline-breadcrumb-symbols-warning-face ,warn ,bg)
+                    (lsp-headerline-breadcrumb-symbols-info-face ,info ,bg)
+                    (lsp-headerline-breadcrumb-symbols-hint-face ,hint ,bg))))
+      (dolist (spec specs)
+        (let ((face (nth 0 spec))
+              (face-fg (nth 1 spec))
+              (face-bg (nth 2 spec)))
+          (when (facep face)
+            ;; face-override-spec 优先于主题，避免主题重算后又变黑
+            (face-spec-set face
+                           `((t :foreground ,face-fg
+                                :background ,face-bg
+                                :underline nil
+                                :box nil
+                                :inherit unspecified))
+                           'face-override-spec))))))
+  (my/fix-lsp-breadcrumb-faces)
+  (with-eval-after-load 'lsp-headerline
+    (my/fix-lsp-breadcrumb-faces))
+  (with-eval-after-load 'lsp-mode
+    (my/fix-lsp-breadcrumb-faces))
+  ;; 主题重载会重算 face，再刷一次
+  (advice-add 'enable-theme :after #'my/fix-lsp-breadcrumb-faces)
+  (advice-add 'load-theme :after #'my/fix-lsp-breadcrumb-faces))
+
+
+(use-package vertico-multiform
+  :ensure nil
+  :after vertico
+  :custom
+  (vertico-multiform-categories '((file (vertico-preselect . prompt))))
+  :init
+  (vertico-multiform-mode))
+
+(use-package orderless
+  :ensure t
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides '((file (styles basic partial-completion))))
+  (completion-pcm-leading-wildcard t)
+  (completion-category-defaults nil))
+
+
+;; 窗口切换
+(use-package ace-window
+  :ensure t
+        :bind ("M-o" . ace-window)) ; 替换原生的 M-o
+
+;;; 下方终端：每次新建会话，关闭时结束进程。
+(defun my/vterm-new-below ()
+  "Open a new Vterm session in the bottom window."
+  (interactive)
+  (let ((display-buffer-overriding-action
+         '((display-buffer-in-side-window)
+           (side . bottom)
+           (slot . 0)
+           (window-height . 0.3))))
+    (vterm-other-window t)))
+
+(defun my/vterm-close ()
+  "Close the current or visible Vterm session and its window."
+  (interactive)
+  (let ((window
+         (if (derived-mode-p 'vterm-mode)
+             (selected-window)
+           (get-window-with-predicate
+            (lambda (win)
+              (with-current-buffer (window-buffer win)
+                (derived-mode-p 'vterm-mode)))
+            nil (selected-frame)))))
+    (unless window
+      (user-error "当前没有打开的 vterm 窗口"))
+    (with-selected-window window
+      (let ((buffer (current-buffer))
+            (process (get-buffer-process (current-buffer))))
+        ;; C-c x 明确结束会话，不再询问是否终止终端进程。
+        (when process
+          (set-process-query-on-exit-flag process nil))
+        (when (kill-buffer buffer)
+          (when (and (window-live-p window) (not (one-window-p t)))
+            (delete-window window)))))))
+
+(use-package vterm
+  :ensure t
+  :commands vterm-other-window
+  :bind (("C-c v" . my/vterm-new-below)
+         ("C-c x" . my/vterm-close)
+         :map vterm-mode-map
+         ("C-c v" . my/vterm-new-below)
+         ("C-c x" . my/vterm-close)))
+
+;;; 居中辅助留白
+(use-package olivetti
+        :ensure t
+        :custom
+        (olivetti-body-width 100) ; <字符宽度> 留白
+        (olivetti-style nil ) ; 左右留白
+        (olivetti-mode-on-hook nil) ; 长显示方式
+        :hook ((prog-mode . olivetti-mode)
+                      (text-mode . olivetti-mode)
+                      (dired-mode . olivetti-mode))
+        :bind ("C-c z" . olivetti-mode)
+
+        )
+
+(use-package marginalia
+  :ensure t
+  :init
+  (marginalia-mode))
+
+(use-package consult
+  :ensure t
+  :bind (;; 1. 项目全局搜索
+         ("C-c s p" . consult-ripgrep)
+         ;; 2. 搜索当前项目的所有 Buffer
+         ("C-c s b" . consult-project-buffer)
+         ;; 3. 跳转功能
+         ("M-g g" . consult-goto-line)     ; 带预览的行跳转
+         ("M-g m" . consult-mark)          ; 跳转到标记点
+         ("M-g i" . consult-imenu)         ; 跳转到当前文件的函数/类定义 (Java/C++ 必备)
+         ;; 4. 搜索增强
+         ("C-s" . consult-line))           ; 替换原生搜索，带实时预览
+  :config
+  (setq consult-preview-key 'any)) ; 实时预览
+
+
+
+
+
+
+
+
+
+;;; -------------------- tree-sitter --------------------
+;; 只负责高亮/缩进；补全跳转仍由 lsp-mode。
+;; 缺 grammar 时: M-x my/treesit-install-grammars（需 git + C 编译器）
+(use-package treesit
+  :ensure nil
+  :init
+  (setq treesit-language-source-alist
+        '((bash "https://github.com/tree-sitter/tree-sitter-bash")
+          (c "https://github.com/tree-sitter/tree-sitter-c")
+          (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
+          (css "https://github.com/tree-sitter/tree-sitter-css")
+          (go "https://github.com/tree-sitter/tree-sitter-go")
+          (html "https://github.com/tree-sitter/tree-sitter-html")
+          (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "master" "src")
+          (json "https://github.com/tree-sitter/tree-sitter-json")
+          (python "https://github.com/tree-sitter/tree-sitter-python")
+          (rust "https://github.com/tree-sitter/tree-sitter-rust")
+          (toml "https://github.com/tree-sitter/tree-sitter-toml")
+          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")
+          (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+          (yaml "https://github.com/ikatyang/tree-sitter-yaml")))
+  :config
+  (let ((grammar-dir (expand-file-name "tree-sitter" user-emacs-directory)))
+    (make-directory grammar-dir t)
+    (add-to-list 'treesit-extra-load-path grammar-dir))
+
+  (defun my/treesit-lang-for-ts-mode (ts-mode)
+    "Map a *-ts-mode symbol to its tree-sitter language symbol."
+    (pcase ts-mode
+      ('c++-ts-mode 'cpp)
+      ('js-ts-mode 'javascript)
+      ('tsx-ts-mode 'tsx)
+      (_ (intern (string-remove-suffix "-ts-mode" (symbol-name ts-mode))))))
+
+  ;; 仅当 grammar 已装好才 remap，避免 Warning 刷屏
+  (dolist (mapping '((bash-mode . bash-ts-mode)
+                     (c-mode . c-ts-mode)
+                     (c++-mode . c++-ts-mode)
+                     (css-mode . css-ts-mode)
+                     (go-mode . go-ts-mode)
+                     (html-mode . html-ts-mode)
+                     (js-mode . js-ts-mode)
+                     (javascript-mode . js-ts-mode)
+                     (js-json-mode . json-ts-mode)
+                     (json-mode . json-ts-mode)
+                     (python-mode . python-ts-mode)
+                     (rust-mode . rust-ts-mode)
+                     (typescript-mode . typescript-ts-mode)
+                     (yaml-mode . yaml-ts-mode)))
+    (when (treesit-language-available-p
+           (my/treesit-lang-for-ts-mode (cdr mapping)))
+      (add-to-list 'major-mode-remap-alist mapping)))
+
+  (defun my/treesit-install-grammars ()
+    "Install missing grammars from `treesit-language-source-alist'."
+    (interactive)
+    (dolist (entry treesit-language-source-alist)
+      (let ((lang (car entry)))
+        (condition-case err
+            (unless (treesit-language-available-p lang)
+              (message "Installing tree-sitter grammar: %s ..." lang)
+              (treesit-install-language-grammar lang)
+              (message "Installed: %s" lang))
+          (error (message "Failed %s: %S" lang err)))))
+    (message "Done. Restart Emacs to apply remaps.")))
+
+(use-package org
+  :ensure nil
+  :bind (("C-c c" . org-capture)
+         ("C-c a" . org-agenda))
+  :init
+  (setq org-directory (expand-file-name "org" user-emacs-directory)
+        org-default-notes-file (expand-file-name "todo.org" org-directory)
+        org-agenda-files (list org-default-notes-file)
+        org-log-done 'time)
+  :config
+  ;; Enable `<s TAB` style easy templates in Org buffers.
+  (require 'org-tempo)
+  (unless (file-directory-p org-directory)
+    (make-directory org-directory t))
+  (unless (file-exists-p org-default-notes-file)
+    (with-temp-file org-default-notes-file
+      (insert "#+title: Todo\n\n")))
+  (setq org-capture-templates
+        '(("t" "Todo" entry (file org-default-notes-file)
+           "* TODO %?\n%U\n"))))
+
+(use-package project
+  :ensure nil ; 内置
+  :bind (("C-x p f" . project-find-file)    ; 快速找项目内的文件
+         ("C-x p b" . project-switch-to-buffer) ; 只在项目 Buffer 间切换
+         ("C-x p c" . project-compile)))   ; 在项目根目录运行编译
+
+(defconst my/code-indent-width 8
+  "Preferred indentation width for programming modes.")
+
+(defun my/set-code-indent-width ()
+  "Apply `my/code-indent-width' to the current programming buffer."
+  (setq-local indent-tabs-mode nil)
+  (setq-local tab-width my/code-indent-width)
+  (setq-local standard-indent my/code-indent-width)
+  (dolist (sym '(c-basic-offset
+                 js-indent-level
+                 js-switch-indent-offset
+                 typescript-ts-mode-indent-offset
+                 treesit-simple-indent-offset
+                 rust-indent-offset
+                 rust-ts-mode-indent-offset
+                 go-ts-mode-indent-offset
+                 css-indent-offset
+                 sh-basic-offset
+                 python-indent-offset))
+    (when (boundp sym)
+      (set (make-local-variable sym) my/code-indent-width)))
+  (when (derived-mode-p 'emacs-lisp-mode 'lisp-mode 'lisp-interaction-mode)
+    (setq-local lisp-body-indent my/code-indent-width)
+    (setq-local lisp-indent-offset my/code-indent-width)))
+
+(add-hook 'prog-mode-hook #'my/set-code-indent-width)
+
+(dolist (buffer (buffer-list))
+  (with-current-buffer buffer
+    (when (derived-mode-p 'prog-mode)
+      (my/set-code-indent-width))))
+
+;;; -------------------- 注释 / 括号（编辑器内置，不是 LSP） --------------------
+;; 注释续行：默认 M-j（comment-indent-new-line），不改 RET。
+;; 括号自动成对：electric-pair-mode（敲 ( 自动补 )，光标夹在中间）。
+(setq comment-empty-lines t
+      comment-multi-line t)
+(electric-pair-mode 1)
+;; 可选：高亮匹配括号（默认多数情况已开，再确保一次）
+(show-paren-mode 1)
+
+;;; 符号「合并」= 字体连字 ligature（也不是 LSP）
+;; 需要字体本身支持（你用的 Maple Mono NF 通常支持）。
+(use-package ligature
+  :ensure t
+  :config
+  (ligature-set-ligatures
+   'prog-mode
+   '("--" "---" "==" "===" "!=" "!==" "<=" ">="
+     "&&" "||" "->" "=>" "::" ".." "..."
+     "/*" "*/" "//" "///"
+     "+=" "-=" "*=" "/=" "%="
+     "<<" ">>" "|||" "&&&"))
+  (global-ligature-mode t))
+
+(defun my/format-buffer ()
+  "Format current buffer on demand.
+
+Prefer lsp-mode formatting when available, else reindent the whole buffer."
+  (interactive)
+  (cond
+   ((bound-and-true-p lsp-mode)
+    (call-interactively #'lsp-format-buffer))
+   (t (indent-region (point-min) (point-max)))))
+
+(global-set-key (kbd "C-c f") #'my/format-buffer)
+
+;;; -------------------- 补全 UI (Corfu) --------------------
+(use-package corfu
+  :ensure t
+  :init
+  (global-corfu-mode)
+  :bind
+  (:map global-map
+        ("C-<return>" . completion-at-point)
+        ("C-c TAB" . completion-at-point))
+  (:map corfu-map
+        ("TAB" . corfu-next)
+        ("S-TAB" . corfu-previous)
+        ("<backtab>" . corfu-previous)
+        ("S-SPC" . corfu-insert-separator)
+        ("M-d" . corfu-popupinfo-toggle)
+        ("M-p" . corfu-popupinfo-scroll-down)
+        ("M-n" . corfu-popupinfo-scroll-up))
+  :custom
+  ;; 输入 2 个字符后自动弹出（嫌烦可改回 nil，只用 C-RET）
+  (corfu-auto t)
+  (corfu-auto-delay 0.12)
+  (corfu-auto-prefix 2)
+  (corfu-cycle t)
+  (corfu-preselect 'first)
+  (corfu-preview-current nil)
+  (corfu-on-exact-match nil)
+  (corfu-quit-no-match 'separator)
+  (corfu-quit-at-boundary 'separator)
+  ;; 弹窗尺寸 / 滚动
+  (corfu-count 14)
+  (corfu-scroll-margin 2)
+  (corfu-min-width 28)
+  (corfu-max-width 100)
+  ;; 右侧文档卡片
+  (corfu-popupinfo-delay '(0.25 . 0.08))
+  (corfu-popupinfo-max-width 70)
+  (corfu-popupinfo-max-height 20)
+  :config
+  (corfu-popupinfo-mode 1)
+  (corfu-history-mode 1)
+  (add-to-list 'savehist-additional-variables 'corfu-history)
+  ;; 不硬编码颜色：Corfu 默认 face 继承主题。
+  ;;
+  ;; 光标在 ) ] } 上/前补全时，Corfu 插入 + LSP exit-fn 可能二次
+  ;; delete-region 把闭括号吃掉。插入前后把闭括号记下来，丢了就补回。
+  (defun my/completion-save-closers ()
+    "光标处及之后连续的闭括号/引号。"
+    (buffer-substring-no-properties
+     (point)
+     (save-excursion
+       (skip-chars-forward "])}>'\"`")
+       (point))))
+
+  (defun my/completion-restore-closers (closers)
+    "若 CLOSER 被补全吃掉则插回，光标仍留在括号内侧。"
+    (when (and closers
+               (not (string-empty-p closers))
+               (not (looking-at (regexp-quote closers))))
+      (insert closers)
+      (backward-char (length closers))))
+
+  (defun my/corfu-insert-preserve-closers (orig status)
+    (let ((closers (my/completion-save-closers)))
+      (funcall orig status)
+      (my/completion-restore-closers closers)))
+  (advice-add #'corfu--insert :around #'my/corfu-insert-preserve-closers)
+  )
+
+;; Emacs 30 及更早版本的终端需要使用 overlay 绘制补全弹窗。
+(use-package corfu-terminal
+  :ensure t
+  :if (and (not (display-graphic-p))
+           (not (featurep 'tty-child-frames)))
+  :after corfu
+  :config
+  (corfu-terminal-mode 1)
+
+  ;; 撤掉旧的「按键前隐藏菜单」及额外隐藏再定位：候选查询中的 redisplay
+  ;; 会把菜单消失的中间状态刷到终端，导致每次输入都闪烁。
+  (advice-remove 'corfu--prepare #'my/corfu-terminal-hide-before-input)
+  (advice-remove 'corfu--popup-show #'my/corfu-terminal-popup-follow-point)
+
+  ;; corfu-terminal 本身会先删除旧 Popon 再创建新的；作为一次屏幕更新提交，
+  ;; 保留查询候选期间的旧菜单，避免显示删除与重建之间的空白状态。
+  (defun my/corfu-terminal-atomic-popup (orig &rest args)
+    (if (and corfu-terminal-mode (not (display-graphic-p)))
+        (let ((inhibit-redisplay t))
+          (apply orig args))
+      (apply orig args)))
+  (advice-add 'corfu--popup-show :around #'my/corfu-terminal-atomic-popup)
+
+  ;; 定位正确也不代表覆盖层安全：长行换行或其它 overlay 改变显示宽度后，
+  ;; Popon 重新绘制的 display overlay 仍可能跨过输入点。Emacs 会在下一次
+  ;; 输入时把 point 调整到覆盖层末尾；所以在每次底层重绘后移除冲突行。
+  ;; 保留该行正文及输入位置，候选菜单的其它行继续显示。
+  (defun my/corfu-terminal-protect-point (&rest _)
+    (when (and corfu-terminal-mode corfu-terminal--popon)
+      (walk-windows
+       (lambda (window)
+         (when (and (not (display-graphic-p (window-frame window)))
+                    (memq corfu-terminal--popon
+                          (window-parameter window 'popon-list)))
+           (let ((cursor (window-point window)))
+             (set-window-parameter
+              window 'popon-overlays
+              (seq-remove
+               (lambda (overlay)
+                 (when-let* ((start (overlay-start overlay))
+                             (end (overlay-end overlay))
+                             ((<= start cursor)) ((< cursor end))
+                             ((overlay-get overlay 'display)))
+                   (delete-overlay overlay)
+                   t))
+               (window-parameter window 'popon-overlays))))))
+       'no-minibuffer t)))
+  (advice-add 'popon--redisplay-1 :after #'my/corfu-terminal-protect-point)
+  (advice-add 'corfu--popup-show :after #'my/corfu-terminal-protect-point))
+
+;; 候选项左侧类型图标（函数 / 变量 / 模块…）
+(use-package nerd-icons-corfu
+  :ensure t
+  :after corfu
+  :config
+  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+
+;; 终端补全菜单：缩窄、减少遮挡，避免撑满 Olivetti 的正文区域。
+(unless (display-graphic-p)
+  (setq corfu-count 10
+        corfu-min-width 24
+        corfu-max-width 70
+        corfu-terminal-position-right-margin 2)
+  ;; 左侧已有类型图标；保留类型详情和导入来源，隐藏重复的文字标签。
+  (with-eval-after-load 'lsp-completion
+    (setq lsp-completion-show-kind nil)))
+
+;;; -------------------- 缩进竖线 (≈ nvim indent-blankline 的竖线) --------------------
+;; 只要各层竖线，不要作用域下划线。
+;; macOS NS Emacs 对 stipple 支持差 → prefer-character 用 │。
+(use-package indent-bars
+  :ensure t
+  :hook ((prog-mode . indent-bars-mode)
+         (yaml-mode . indent-bars-mode)
+         (yaml-ts-mode . indent-bars-mode)
+         (conf-mode . indent-bars-mode))
+  :custom
+  (indent-bars-pattern ".")
+  (indent-bars-width-frac 0.25)
+  (indent-bars-pad-frac 0.1)
+  (indent-bars-prefer-character t)
+  (indent-bars-no-stipple-char ?\│)
+  (indent-bars-display-on-blank-lines t)
+  (indent-bars-color '("#5c6370" :blend 0.5))
+  (indent-bars-color-by-depth
+   '(:palette ("#E06C75" "#E5C07B" "#61AFEF" "#D19A66"
+               "#98C379" "#C678DD" "#56B6C2")
+     :blend 0.8))
+  (indent-bars-highlight-current-depth
+   '(:color "#61AFEF" :blend 0.85))
+  (indent-bars-highlight-selection-method 'context)
+  ;; 不用 treesit scope 淡化，避免和“下划线 scope”混在一起
+  (indent-bars-treesit-support nil))
+
+;; .rs 固定走内置 rust-ts-mode（tree-sitter），不再用 MELPA rust-mode。
+;; 需已安装 rust grammar：~/.config/emacs/tree-sitter/libtree-sitter-rust.*
+;; 缺失时: M-x my/treesit-install-grammars 或
+;;         M-x treesit-install-language-grammar RET rust
+(use-package rust-ts-mode
+  :ensure nil
+  :mode "\\.rs\\'"
+  :init
+  ;; 即使其它包注册了 rust-mode，也优先 remap 到 ts 版
+  (add-to-list 'major-mode-remap-alist '(rust-mode . rust-ts-mode))
+  :config
+  (unless (treesit-language-available-p 'rust)
+    (display-warning
+     'rust-ts-mode
+     "Rust tree-sitter grammar 未安装。请执行: M-x treesit-install-language-grammar RET rust"
+     :warning)))
+
+;;; Snippet：lsp-enable-snippet 需要 yasnippet 才真正展开
+(use-package yasnippet
+  :ensure t
+  :hook (prog-mode . yas-minor-mode)
+  :config
+  (yas-reload-all))
+
+(use-package yasnippet-snippets
+  :ensure t
+  :after yasnippet)
+
+;;; -------------------- LSP (lsp-mode) --------------------
+(use-package lsp-mode
+  :ensure t
+  :commands (lsp lsp-deferred)
+  :hook ((rust-ts-mode . lsp-deferred)
+         (c-mode . lsp-deferred)
+
+         (c-ts-mode . lsp-deferred)
+         (c++-mode . lsp-deferred)
+         (c++-ts-mode . lsp-deferred)
+         (java-mode . lsp-deferred)
+         (python-mode . lsp-deferred)
+         (python-ts-mode . lsp-deferred)
+         (js-mode . lsp-deferred)
+         (js-ts-mode . lsp-deferred)
+         (typescript-mode . lsp-deferred)
+         (typescript-ts-mode . lsp-deferred)
+         (tsx-ts-mode . lsp-deferred)
+         (css-mode . lsp-deferred)
+         (css-ts-mode . lsp-deferred)
+         (json-mode . lsp-deferred)
+         (json-ts-mode . lsp-deferred)
+         (js-json-mode . lsp-deferred))
+  :init
+  (setq lsp-keymap-prefix "C-c l")
+  :custom
+  (lsp-enable-snippet t)              ; 与 yasnippet 对齐
+  ;; :insert 用较短 range，避免 :replace 把光标后的 ) 算进替换区
+  (lsp-completion-default-behaviour :insert)
+  (lsp-inlay-hint-enable t)           ; 显示 rust-analyzer 推断的变量类型
+  (lsp-headerline-breadcrumb-enable t)
+  (lsp-auto-guess-root t)
+  ;; Corfu 使用 LSP 的 CAPF；:none 只关闭 Company 自动配置。
+  (lsp-completion-provider :none)
+  ;; 默认 t：保存前会向 LSP 发 willSaveWaitUntil，并把 server 返回的 edits
+  ;; 写回 buffer 再落盘。若 rust-analyzer 等与 buffer 短暂不同步，可能把
+  ;; 「这一次」的编辑冲掉，磁盘上就像还停在上一次保存。先关掉更安全；
+  ;; 需要 server 在保存前改文件（organize imports 等）再改回 t。
+  (lsp-before-save-edits nil)
+  (lsp-format-buffer-on-save nil)
+  (lsp-fix-all-on-save nil)
+  (lsp-session-file (expand-file-name "lsp-session-v1" my/var-dir))
+  (lsp-server-install-dir (expand-file-name "lsp-server/" my/var-dir))
+  ;; Python 用 lsp-pyright，不必再加载 pylsp 客户端
+  (lsp-client-packages
+   '(lsp-clangd lsp-javascript lsp-rust lsp-java lsp-css))
+  :bind (:map lsp-mode-map
+              ("C-c r" . lsp-rename)
+              ("C-c h" . lsp-describe-thing-at-point)
+              ("C-c d" . lsp-ui-doc-glance)
+              ("C-c f" . my/format-buffer))
+  :config
+  (require 'lsp-pyright nil t)
+  (lsp-enable-which-key-integration t)
+  (when (fboundp 'my/fix-lsp-breadcrumb-faces)
+    (my/fix-lsp-breadcrumb-faces))
+
+  ;; LSP 确认补全时的 exit-fn 会再 delete-region 一次，常把 ) 删掉
+  (defun my/lsp-exit-fn-preserve-closers (orig candidate status &optional candidates)
+    (let ((closers (and (fboundp 'my/completion-save-closers)
+                        (my/completion-save-closers))))
+      (funcall orig candidate status candidates)
+      (when (fboundp 'my/completion-restore-closers)
+        (my/completion-restore-closers closers))))
+  (advice-add 'lsp-completion--exit-fn :around
+              #'my/lsp-exit-fn-preserve-closers))
+
+(use-package lsp-ui
+  :ensure t
+  :after lsp-mode
+  :custom
+  (lsp-ui-doc-enable t)
+  (lsp-ui-sideline-enable t)
+  (lsp-ui-sideline-show-diagnostics t))
+
+(use-package lsp-pyright
+  :ensure t
+  :after lsp-mode)
+
+(use-package flycheck
+  :ensure t
+  :hook (lsp-mode . flycheck-mode)
+  :bind (:map flycheck-mode-map
+              ("M-n" . flycheck-next-error)
+              ("M-p" . flycheck-previous-error)
+              ("C-c ! l" . flycheck-list-errors)))
+
+;; modeline 美化
+(use-package doom-modeline
+  :ensure t
+  :init (doom-modeline-mode 1)
+  :custom
+  (doom-modeline-height 25)     ; 设置合适的高度
+  (doom-modeline-bar-width 3)   ; 左侧装饰条宽度
+  (doom-modeline-icon t)        ; 开启图标（需安装 nerd-icons）
+  (doom-modeline-major-mode-icon t)
+  (doom-modeline-buffer-file-name-style 'truncate-with-project)) ; 智能显示路径
+
+;; 平滑滚动（全局，不绑在某个包上）
+(when (fboundp 'pixel-scroll-precision-mode)
+  (pixel-scroll-precision-mode 1))
+
+;; === Git ===
+(use-package magit
+  :ensure t
+  :bind (("C-x g" . magit-status))
+  :config
+  (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
+
+;; 编辑时在 fringe 实时显示 VCS 改动行。和 magit 互补:
+;; magit 管暂存/提交,diff-hl 管「此刻这个文件改了哪几行」的即时可视。
+(use-package diff-hl
+  :ensure t
+  :hook ((prog-mode . diff-hl-mode)
+         ;; magit 操作前后刷新,避免 diff-hl 标记与实际状态脱节。
+         (magit-pre-refresh . diff-hl-magit-pre-refresh)
+         (magit-post-refresh . diff-hl-magit-post-refresh)))
+
+;; 高亮 TODO / FIXME / HACK / NOTE 等关键字,一眼看到代码里的待办。
+(use-package hl-todo
+  :ensure t
+  :hook (prog-mode . hl-todo-mode))
+
+(use-package server
+  :ensure nil
+  :config
+  (unless (server-running-p)
+    (server-start)))
+
+
+;; ==== defun ====
+(defun open-init-file()
+  (interactive)
+  (find-file "~/.config/emacs/init.el")
+  )
+
+(defun my/project-run ()
+  (interactive)
+  (let ((default-directory (project-root (project-current t))))
+    (cond
+     ((file-exists-p "Cargo.toml") (compile "cargo run"))
+     ((file-exists-p "go.mod")     (compile "go run ."))
+     ((file-exists-p "pom.xml")    (compile "mvn exec:java"))
+     ((file-exists-p "Makefile")   (compile "make -k"))
+     (t (call-interactively 'compile)))))
+
+;; 智能行首:C-a 在「首个非空白字符」和「真正的行首」之间切换(借鉴 alynx)。
+(defun my/smarter-move-beginning-of-line (arg)
+  "Move to the first non-whitespace char, or to BOL if already there.
+With ARG, move forward ARG-1 lines first."
+  (interactive "^p")
+  (setq arg (or arg 1))
+  (when (/= arg 1)
+    (let ((line-move-visual nil))
+      (forward-line (1- arg))))
+  (let ((orig-point (point)))
+    (back-to-indentation)
+    (when (= orig-point (point))
+      (move-beginning-of-line 1))))
+
+(global-set-key [remap move-beginning-of-line]
+                #'my/smarter-move-beginning-of-line)
+
+;; C/C++ 头文件↔源文件互跳(内置 find-sibling-file, Emacs 29+)。
+;; 只打开已存在的兄弟文件;.h 会同时匹配 .c/.cpp/.cc。
+(setq find-sibling-rules
+      '(("\\([^/]+\\)\\.c\\'" "\\1.h")
+        ("\\([^/]+\\)\\.h\\'" "\\1.c" "\\1.cpp" "\\1.cc")
+        ("\\([^/]+\\)\\.cpp\\'" "\\1.h" "\\1.hpp")
+        ("\\([^/]+\\)\\.hpp\\'" "\\1.cpp")))
+(global-set-key (kbd "C-c M-f") #'find-sibling-file)
+
+
+
+
+
+
+
+;; ==== key ====
+(global-set-key (kbd "<f2>") 'open-init-file)
+(global-set-key (kbd "<f5>") 'my/project-run)
+;; 复制当前行到下一行；有选区则复制选区（Emacs 29+ 内置）
+(global-set-key (kbd "C-c j") #'duplicate-dwim)
+
+;; 主题在 kanagawa-themes 的 use-package 里加载。
+;; Corfu 不硬编码颜色，换主题自动跟。
+;; GC / read-process-output-max 只在 early-init.el。
