@@ -1,403 +1,165 @@
 
-;; 原生光标移动
-;; C-f/b 单个字符移动 h/l
-;; M-f/b 单个单词移动 e/b
-;; M-a/e 语句块移动
-;; M-{/} 跳过整个空行分割的块
-;; C-M-f/b 括号移动,比如从`(`跳到`)`
-;; C-M-n/p 括号跳转
-;; === LSP 补全 ===
-;; C-return LSP+ctags补全窗口
-;; C-x c j 跳转符号定义
-;; C-x c p 在小窗口预览定义
-;; C-. 跳转定义LSP
-;; C-, 跳回
-;; === 插件 ===
-;; C-' avy 查找字符移动，相当于nvim - flash
-;; M-g l 跳转到行
-;; M-g w 跳转到单词的首字母
-;; M-g e 把远处的行移动过来
-;; M-g c 把远处的行拷过来
-;; k -> 杀掉那一行
-;; y -> 复制那一行
-;; t -> 把那一行瞬移到我这里
+;; custom.el 文件，不然emacs总是把设置存在init里面，不好管理，还不好看
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(load custom-file t t) ;; 加载custom
 
-;; C-s 查找行字符
-;; C-x b 查找buffer
-;; M-g o `consult-outline` 大范围跳转，原理为将标题，类名，方法名作为了锚点
-;; C-c f 查找文件
-;; C-c g 查找单词
-
-;; font :
-;; Monaspace Neon medium normal
-
-
-
-
-(setq custom-file (expand-file-name ".emacs.custom.el" user-emacs-directory))
-(load custom-file t t)
-
-
-(setq inhibit-startup-message t)
-
-
-
-
-(org-babel-do-load-languages
- 'org-babel-load-languages
- '((emacs-lisp . t)
-   (sql . t)
-   (shell . t)  
-   (python . t) 
-   (js . t)     
-   ))
-
-
-(column-number-mode 0)
-(global-display-line-numbers-mode)
-(setq display-line-numbers-type 'relative)
-(menu-bar-mode -1)
-(tool-bar-mode -1)
-(scroll-bar-mode -1)
-      
 (require 'package)
-(setq package-enable-at-startup nil);;取消自启
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+;; 由于emacs在terminal 下无法粘贴到剪贴板所有写两个函数用来实现
+;; (defun abk/clipboard-copy (text)
+;;   (with-temp-buffer ;; 以下内容使用一个temp临时buffer
+;;   (insert text)
+;;   (call-process-region ;; 对区域region 对用进程 call process 
+;;    (point-min)(point-max) "/usr/bin/pbcopy")) ;; 将选中区域发给pbcopy
+;;   )
+(defun abk/clipboard-copy (text)
+  (with-temp-buffer
+    (insert text)
+    (call-process-region
+     (point-min) (point-max) "/usr/bin/pbcopy")))
+;; 同样，粘贴可以这么写
+;; Similarly, the paste can be writen like this
+;; (defun abk/clipboard-paste()
+;;   (with-temp-buffer
+;;     (insert (shell-command-to-string "/usr/bin/pbpaste"))))
+(defun abk/clipboard-paste ()
+  (shell-command-to-string "/usr/bin/pbpaste"));; 因为直接调用，所以不用insert
 
-(setq package-archives '(("gnu". "https://elpa.gnu.org/packages/")
-			 ("nongnu" . "https://elpa.nongnu.org/nongnu/")
-			 ("melpa-tuna"  . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-			 ("melpa" . "https://melpa.org/packages/")))
+(setq interprogram-cut-function #'abk/clipboard-copy
+      interprogram-paste-function #'abk/clipboard-paste)
 
-(package-initialize);; 显式启用
-
-
-
-;; Emacs29以上自带use-package,直接require就可以使用
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(require 'cl-lib)
-(require 'use-package)
-
-
-
-
-
-
-
-;; === theme ===
-;; 主题
-(use-package catppuccin-theme
+(use-package lsp-mode
   :ensure t
-  :demand t
-  :init
-  (setq catppuccin-flavor 'mocha)
-  :config
-  (load-theme 'catppuccin t)
+  :init ;; init 插件加载之前就需要进行执行
+  :custom
+  (lsp-inlay-hint-enable t)
+  (setq lsp-keymap-prefix "C-c l") ;; 将lsp按键前置改为C-c l
+  :hook((rust-mode . lsp-deferred)
+	(rust-ts-mode . lsp-deferred)
+	(lsp-mode . lsp-enable-which-key-integration))
+  :commands (lsp lsp-deferred)
+
   )
 
-
-
-;; 多光标
-(use-package  multiple-cursors
+(use-package lsp-ui
   :ensure t
-  :bind (
-   ("C-S-c C-S-c" . mc/edit-lines);; 选中区域转换可编辑行
-   ("C->" . mc/mark-next-like-this);; 向上延伸光标
-   ("C-<" . mc/mark-previous-like-this);; 向上延伸光标
-   ("C-c C-<" . mc/mark-all-like-this));; 把当前选中的单词前面都加上光标
+  ;; lsp-ui的变量赋值
+  :custom
+  (lsp-ui-doc-enable t)
+  (lsp-ui-doc-show-with-cursor t)
+  (lsp-ui-imenu-auto-refresh t)
+  (lsp-ui-sideline-show-hover t)
+  (lsp-ui-sideline-show-code-actions t)
+  (lsp-ui-sideline-update-mode 'point)
+  (lsp-ui-peek-enable t)
+  (lsp-ui-peek-show-directory t)
+  ;; lsp-ui的快捷键
+  :config
+  (define-key lsp-ui-mode-map [remap xref-find-definitions] #'lsp-ui-peek-find-definitions)
+  (define-key lsp-ui-mode-map [remap xref-find-references] #'lsp-ui-peek-find-references)
+  
   )
 
-
-
-(use-package vertico
+(use-package rust-mode
   :ensure t
-  :init
-  (vertico-mode)
-  :config
-  (setq vertico-cycle t)) 
+  :mode ("\\.rs\\'" . rust-mode))
 
-
-
-(use-package vertico-posframe
-  :ensure t
-  :after vertico
-  :config
-  (vertico-posframe-mode 1)
-
-  (setq vertico-posframe-parameters
-        '((left-fringe . 8)
-          (right-fringe . 8)))
-
-  (setq vertico-posframe-poshandler #'posframe-poshandler-frame-center))
-
-
-(use-package consult
-  :ensure t
-  :bind (
-         ("C-s" . consult-line)
-         ("C-x b" . consult-buffer)
-         ("C-c f" . consult-find)
-         ("C-c g" . consult-ripgrep)
-         ("M-g o" . consult-outline))
-  :config
-  (setq consult-preview-key 'any))
-
-
-(use-package marginalia
-  :ensure t
-  :init
-  (marginalia-mode))
-
-
-
-;; 尝试插件但是不下载到本地
-(use-package try
+(use-package tree-sitter
   :ensure t)
+(use-package tree-sitter-langs
+  :ensure t
+  :after tree-sitter
+  :demand t ;; 立即加载
+  :config
+  (require 'tree-sitter-hl);; 启用语法高亮
+  ;; 将diff-mode 从 tree-sitter-major-mode-language-table 哈希里面删除
+  (remhash 'diff-mode tree-sitter-major-mode-language-table)
+  ;; 钩子: 缓冲区触发tree-sitter-after-on-hook后开启tree-sitter-hl-mode高亮
+  (add-hook 'tree-sitter-after-on-hook #'tree-sitter-hl-mode)
+  ;; (全局)为支持tree-sitter的缓冲区启用
+  (global-tree-sitter-mode 1)
+  )
 
-;; 指令重启Emacs
-(use-package restart-emacs
-  :ensure t)
+(require 'tree-sitter)
+(require 'tree-sitter-langs)
+(require 'tree-sitter-hl)
+(global-tree-sitter-mode 1)
+(tree-sitter-require 'rust)
+;; 语言解析开始，钩子触发高亮
+(add-hook 'tree-sitter-after-on-hook
+	   #'tree-sitter-hl-mode)
+
+;; 跳转保存
+(use-package flycheck
+  :ensure t
+  :hook (lsp-mode . flycheck-mode)
+  :bind (:map flycheck-mode-map
+              ("M-n" . flycheck-next-error)
+              ("M-p" . flycheck-previous-error)
+              ("C-c ! l" . flycheck-list-errors)))
 
 (use-package which-key
   :ensure t
-  :config (which-key-mode))
-
-(use-package seq
-  :ensure t)
-
-(use-package move-text
-  :ensure t
-  :bind (("M-p" . move-text-up)   
-         ("M-n" . move-text-down))) 
-
-(use-package avy
-  :ensure t
-  :bind
-  (("C-'" . avy-goto-char-timer)
-   ("M-g l" . avy-goto-line)
-   ("M-g w" . avy-goto-word-1)  ; 新增：跳到单词首字母
-   ("M-g e" . avy-move-line)    ; 新增：把远处的行移过来
-   ("M-g c" . avy-copy-line))   ; 新增：把远处的行拷过来
   :config
-  (setq avy-background t)
-  (setq avy-timeout-seconds 0.5)
-  (setq avy-all-windows t)      ; 允许跨窗口跳转
-  
-  ;; --- 高级功能：Dispatch (远程操作) ---
-  (defun my/avy-action-kill-whole-line (pt)
-    (save-excursion
-      (goto-char pt)
-      (kill-whole-line))
-    (select-window
-     (cdr (ring-ref avy-ring 0)))
-    t)
+  (which-key-mode))
 
-  (defun my/avy-action-copy-whole-line (pt)
-    (save-excursion
-      (goto-char pt)
-      (cl-destructuring-bind (start . end) (bounds-of-thing-at-point 'line)
-        (copy-region-as-kill start end))
-      (message "Copied line"))
-    t)
-
-  (defun my/avy-action-yank-whole-line (pt)
-    (my/avy-action-copy-whole-line pt)
-    (save-excursion (yank))
-    t)
-
-  ;; 绑定：
-  ;; k -> 杀掉那一行
-  ;; y -> 复制那一行
-  ;; t -> 把那一行瞬移到我这里
-  (setq avy-dispatch-alist
-        '((?k . my/avy-action-kill-whole-line)
-          (?y . my/avy-action-copy-whole-line)
-          (?t . my/avy-action-yank-whole-line)))
-  )
-
-
-;; ==ctags==
-(use-package citre
+(use-package company
   :ensure t
-  :defer t
-  :init
-  (require 'citre-config)
-  (citre-auto-enable-citre-mode)
-  :bind
-  (
-   ("C-x c j" . citre-jump)
-   ("C-x c p" . citre-peek)
-   ("C-x c u" . citre-update-this-tags-file)
-   )
-  :config
-  (setq citre-use-project-root-when-creating-tags t)
-  (setq citre-prompt-language-for-ctags-command t )
-  (setq citre-peek-use-icons t)
-  (add-hook 'after-save-hook 
-            (lambda () 
-              (when (and (bound-and-true-p citre-mode)
-                         (fboundp 'citre-get-tags-file-path)
-                         (citre-get-tags-file-path))
-                (citre-update-this-tags-file))))
-  
-  )
-
-
-
-
-
-
-;; ===LSP===
-;; === Part 1: Eglot (只负责连接 LSP 服务) ===
-(use-package eglot
-  :ensure nil
-  :hook (prog-mode . eglot-ensure) ; 在所有编程语言中启动
-  :config
-  (setq eglot-ignored-server-capabilities '(:documentHighlightProvider)))
-
-(use-package eglot-java
-    :ensure t
-    :hook (java-mode . eglot-java-mode)
-    :init
-    (setq eglot-java-server-install-dir (expand-file-name "eclipse.jdt.ls" user-emacs-directory))
-    (setenv "JAVA_TOOL_OPTIONS" 
-            (concat "-javaagent:" (expand-file-name "java/lombok.jar" user-emacs-directory)))
-    (setenv "JAVA_HOME" "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home")
-    (setenv "PATH" (concat "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin:" (getenv "PATH")))
-    (add-to-list 'exec-path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin")
-    
-    )
-
-(use-package nerd-icons
-	      :ensure t)
-(use-package nerd-icons-corfu
-  :ensure t
-  :after corfu
-  :config
-  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
-
-;; === 代码模板 === 
-(use-package yasnippet
-  :ensure t
-  :config
-  (yas-global-mode 1))
-
-(use-package yasnippet-snippets
-  :ensure t
-  :after yasnippet)
-
-(use-package yasnippet-capf
-  :ensure t
-  :after cape)
-
-(use-package corfu
-  :ensure t
-  :init
-  (global-corfu-mode)
-  :bind
-  (:map global-map
-        ("<C-return>" . completion-at-point)) 
-  (:map corfu-map
-        ("S-SPC" . corfu-insert-separator))
   :custom
-    (corfu-on-exact-match nil)
+  (company-idle-delay 0.2)
+  (company-minimum-prefix-length 2)
   :config
-  (setq 
-   corfu-auto nil
-   corfu-cycle t
-   corfu-popupinfo-delay 0.1
-   corfu-preview-current nil
-   )
-  (corfu-popupinfo-mode)
+  (global-company-mode 1)
+  )
 
-
-  (unless (display-graphic-p)
-    (corfu-terminal-mode +1)))
-
-
-(use-package cape
-  :ensure t
-  :init
-  ;; 全局开启文件路径补全 (比如在 scratch 或 git commit 中)
-  (add-to-list 'completion-at-point-functions #'cape-file)
-  :bind
-  (:map global-map
-	("<C-return>" . completion-at-point))
-  :config
-  (setq corfu-quit-no-match 'separator)
-  (defun my/eglot-capf ()
-    (setq-local completion-at-point-functions
-                (list (cape-capf-super
-                       #'eglot-completion-at-point ; 1. 智能代码补全 (Eglot)
-		       #'yasnippet-capf ; 代码模板
-		       #'citre-completion-at-point ;ctags
-                       #'cape-dabbrev              ; 2. 单词补全 (Cape)
-                       #'cape-file))))             ; 3. 路径补全 (Cape)
-  :hook (eglot-managed-mode . my/eglot-capf))
-
-
- (use-package orderless
-  :ensure t
-  :init
-  (setq completion-styles '(orderless basic)
-        completion-category-defaults nil
-        completion-category-overrides '((file (styles partial-completion)))))
-
-
-;; 终端
-(use-package vterm
-  :ensure t
-  :config
-  (setq vterm-max-scrollback 10000)
-  (setq vterm-kill-buffer-on-exit t)
-  (add-hook 'vterm-mode-hook
-	    (lambda()
-	      (display-line-numbers-mode -1)
-	      (hl-line-mode -1)
-	      (corfu-mode -1)))
-  (defun my/toggle-vterm()
-    (interactive)
-    (let ((buffer-name "*vterm*"))
-      (if (equal (buffer-name) buffer-name)
-	  (switch-to-buffer (other-buffer (current-buffer) 1))
-	(if (get-buffer buffer-name)
-	    (switch-to-buffer buffer-name)
-	  (vterm buffer-name)))))
-  :bind
-  (("C-`" . my/toggle-vterm)))
-
-
-;; === Git ===
 (use-package magit
   :ensure t
   :bind (("C-x g" . magit-status))
   :config
-  (add-hook 'git-commit-setup-hook 'turn-off-flyspell))
+  (add-hook 'git-commit-setup-hook 'turn-off-flyspell)) ;; 关闭拼写检查
 
 
-;; 设置字体
-;; 英文字体:https://monaspace.githubnext.com/
-;; 中文字体:https://github.com/lxgw/LxgwWenKai
-(defun my/apply-font-config ()
-  (interactive)
-  (when (display-graphic-p)
+(use-package vterm
+  :ensure t)
 
-    (set-face-attribute 'default nil
-			:family "Monaspace Neon"
-			:height 140
-			:weight 'normal
-			)
-    (dolist (charset '(kana han symbol cjk-misc bopomofo))
-      (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono")))
-    (setq face-font-rescale-alist '(("LXGW WenKai Mono" . 1.25))))
-  )
-  
+(use-package ace-window
+  :ensure t)
 
-(add-hook 'after-init-hook #'my/apply-font-config)
-(add-hook 'window-setup-hook #'my/apply-font-config)
-(add-hook 'server-after-make-frame-hook #'my/apply-font-config)
+(use-package kanagawa-themes
+  :ensure t
+  :config
+  (load-theme 'kanagawa-dragon t))
 
+;;; 居中留白
+(use-package olivetti
+  :ensure t
+  :custom
+  (olivetti-body-width 100)    ; 正文宽度为 100 列
+  (olivetti-style nil)
+  (olivetti-mode-on-hook nil)
+  :hook ((prog-mode . olivetti-mode)
+         (text-mode . olivetti-mode)
+         (dired-mode . olivetti-mode))
+  :bind ("C-c z" . olivetti-mode))
 
-(my/apply-font-config)
+;; 候选结果竖向显示
+(use-package vertico
+  :ensure t
+  :init
+  (vertico-mode 1))
 
+;; 多关键词匹配
+(use-package orderless
+  :ensure t
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides
+   '((file (styles basic partial-completion)))))
+
+;; 查找与跳转
+(use-package consult
+  :ensure t
+  :bind (("C-s"   . consult-line)     ; 查当前文件内容
+         ("C-c s" . consult-ripgrep) ; 查整个项目内容
+         ("C-c i" . consult-imenu)   ; 查当前文件的函数等定义
+         ("C-x b" . consult-buffer))) ; 查找并切换缓冲区

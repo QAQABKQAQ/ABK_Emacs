@@ -1,1 +1,1 @@
-#s(lsp-session ("/Users/albamkin/Work/deaf_assessment" "/Users/albamkin/rust_learning/bitwise" "/Users/albamkin/python_prject/agent_json") nil #s(hash-table test equal) #s(hash-table test equal) #s(hash-table test equal))
+#s(lsp-session ("/Users/albamkin/Programming/MineProgramming/ai-agent" "/Users/albamkin/Programming/MineProgramming/sentry-post") nil #s(hash-table test equal) #s(hash-table test equal) #s(hash-table test equal))
