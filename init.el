@@ -34,8 +34,7 @@
   :custom
   (lsp-inlay-hint-enable t)
   (setq lsp-keymap-prefix "C-c l") ;; 将lsp按键前置改为C-c l
-  :hook((rust-mode . lsp-deferred)
-	(rust-ts-mode . lsp-deferred)
+  :hook(
 	(lsp-mode . lsp-enable-which-key-integration))
   :commands (lsp lsp-deferred)
 
@@ -60,12 +59,23 @@
   
   )
 
+(use-package svelte-mode
+  :ensure t
+  :mode "\\.svelte\\'"
+  :hook (svelte-mode . lsp-deferred))
+
 (use-package rust-mode
   :ensure t
-  :mode ("\\.rs\\'" . rust-mode))
-
+  :mode "\\.rs\\'"
+  :hook ((rust-mode . lsp-deferred)
+	 (rust-ts-mode . lsp-deferred)))
+(use-package typescript-mode
+  :ensure t
+  :mode "\\.ts\\'"
+  :hook (typescript-mode . lsp-deferred))
 (use-package tree-sitter
   :ensure t)
+
 (use-package tree-sitter-langs
   :ensure t
   :after tree-sitter
