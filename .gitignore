@@ -2,7 +2,7 @@
 *~
 \#*\#
 *.elc
-
+.lsp-session-v1
 # 缓存目录
 .cache/
 auto-save-list/
