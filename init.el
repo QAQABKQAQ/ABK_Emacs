@@ -108,6 +108,25 @@
               ("M-p" . flycheck-previous-error)
               ("C-c ! l" . flycheck-list-errors)))
 
+
+;; C-h . copy报错到剪贴板中
+(defun abk/copy-local-help ()
+  (interactive) ;; 声明此函数为一个命令
+  (if (and (bound-and-true-p flycheck-mode) ;; 检测flycheck是否开启，开启的话返回真
+	   (flycheck-overlay-errors-at (point)) ;; 查询当前(point)位置有无flycheck的报错，有的话返回真
+	   (flycheck-overlay-errors-at (point)));; 如果即开启又有报错则使用flycheck本身的复制
+      (let ((help (help-at-pt-kbd-string)) ;; 定义help 为help-at-pt-kbd-string的结果
+	    )
+	(if help ;; 判断有无内容
+	    (progn ;; 多个表达式打包成一个
+	      (kill-new help) ;; kill-new 会把文字放入 kill ring 剪贴板中，这里将help里面的值存到剪贴板中
+	      (message "No help at point")) ;; 底部显示文字
+	  ))
+      )
+  )
+(global-set-key (kbd "C-h .") #'abk/copy-local-help)
+
+
 (use-package which-key
   :ensure t
   :config
