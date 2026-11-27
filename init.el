@@ -28,17 +28,30 @@
 (setq interprogram-cut-function #'abk/clipboard-copy
       interprogram-paste-function #'abk/clipboard-paste)
 
+;; 复制当前行到下一行
+(global-set-key (kbd "C-c d") #'duplicate-dwim)
+;; 光标到新的一行
+(setq duplicate-line-final-position 1)
+
 (use-package lsp-mode
   :ensure t
   :init ;; init 插件加载之前就需要进行执行
   :custom
   (lsp-inlay-hint-enable t)
-  (setq lsp-keymap-prefix "C-c l") ;; 将lsp按键前置改为C-c l
+  (lsp-keep-workspace-alive nil);; 最后一个项目文件关闭后自动关闭LSP服务器
+  (lsp-keymap-prefix "C-c l") ;; 将lsp按键前置改为C-c l
   :hook(
 	(lsp-mode . lsp-enable-which-key-integration))
   :commands (lsp lsp-deferred)
 
   )
+
+(use-package yasnippet
+  :ensure t
+  :config
+  (yas-global-mode 1)
+ )
+
 
 (use-package lsp-ui
   :ensure t
